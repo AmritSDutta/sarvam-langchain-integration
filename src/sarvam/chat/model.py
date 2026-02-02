@@ -1,4 +1,5 @@
 """Sarvam Chat Model implementation for LangChain."""
+import asyncio
 import logging
 import os
 from typing import Any, Dict, List, Optional, Sequence, Union
@@ -7,10 +8,11 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_function
 from pydantic import Field, SecretStr
+from typing_extensions import override
 
 from sarvamai import SarvamAI
 from sarvamai.core.api_error import ApiError
@@ -208,3 +210,38 @@ class SarvamChat(BaseChatModel):
             **kwargs,
         }
         return self.__class__(**bound_params)
+
+    @override
+    async def ainvoke(
+        self,
+        input: List[BaseMessage],
+        config: Optional[RunnableConfig] = None,
+        *,
+        stop: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> AIMessage:
+        """Async invoke that runs the synchronous _generate in a thread pool.
+
+        Args:
+            input: The input messages to send to the model
+            config: Optional configuration for the runnable
+            stop: Optional list of stop strings
+            **kwargs: Additional arguments to pass to the model
+
+        Returns:
+            The generated AI message
+
+        Note:
+            The Sarvam AI SDK does not support async operations natively.
+            This method uses asyncio.to_thread to run the synchronous
+            _generate method in a separate thread, preventing blocking
+            of the event loop.
+        """
+        result = await asyncio.to_thread(
+            self._generate,
+            input,
+            stop,
+            None,  # run_manager
+            **kwargs,
+        )
+        return result.generations[0].message

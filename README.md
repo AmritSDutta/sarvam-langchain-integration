@@ -11,6 +11,7 @@ LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM 
 
 - 🤖 **SarvamLLM** - Simple prompt-response interface
 - 💬 **SarvamChat** - Multi-turn conversation support
+- ⚡ **Async Support** - Non-blocking async operations
 - 🧠 **Reasoning Mode** - Built-in thinking capability
 - 📚 **Wiki Grounding** - Factual query enhancement
 - 🇮🇳 **Hindi & Indic Languages** - Native language support
@@ -76,6 +77,40 @@ response = chat.invoke([
 ])
 print(response.content)
 ```
+
+### Async Support
+
+Both `SarvamChat` and `SarvamLLM` support async operations using `async`/`await`:
+
+```python
+import asyncio
+from sarvam import SarvamChat, SarvamLLM
+from langchain_core.messages import HumanMessage
+
+async def main():
+    # Async chat invocation
+    chat = SarvamChat()
+    response = await chat.ainvoke([HumanMessage(content="Hello!")])
+    print(response.content)
+
+    # Async LLM invocation
+    llm = SarvamLLM()
+    response = await llm.ainvoke("What is the capital of India?")
+    print(response)  # New Delhi
+
+    # Multiple concurrent requests
+    tasks = [
+        chat.ainvoke([HumanMessage(content=f"Query {i}")])
+        for i in range(5)
+    ]
+    responses = await asyncio.gather(*tasks)
+    for r in responses:
+        print(r.content)
+
+asyncio.run(main())
+```
+
+**Note:** Since the Sarvam AI SDK doesn't support async operations natively, `ainvoke()` uses `asyncio.to_thread()` to run synchronous API calls in a thread pool, preventing event loop blocking while still being fully async-compatible.
 
 ### Advanced Features
 
