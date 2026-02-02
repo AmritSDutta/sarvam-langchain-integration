@@ -147,6 +147,216 @@ response = chat.invoke([
 print(response.content)
 ```
 
+### Structured JSON Output
+
+Sarvam AI can return structured JSON output. The library includes utility functions to extract and parse JSON from responses, even when the model includes reasoning text before the JSON.
+
+#### Simple JSON Output
+
+Extract structured data using JSON format:
+
+```python
+from sarvam import SarvamChat
+from langchain_core.messages import HumanMessage
+from pydantic import BaseModel
+
+class Person(BaseModel):
+    """Simple person model."""
+    name: str
+    age: int
+    city: str
+
+chat = SarvamChat(temperature=0.3)
+
+response = chat.invoke([HumanMessage(content="""
+Extract the person information and return as JSON:
+Text: Priya Sharma is a 32 year old software engineer living in Delhi.
+
+Return JSON with fields: name, age, city
+""")])
+
+# Parse response into Pydantic model
+from sarvam import parse_structured_output
+person = parse_structured_output(response.content, Person)
+
+print(person.name)      # Priya Sharma
+print(person.age)       # 32
+print(person.city)      # Delhi
+```
+
+#### Nested JSON Output
+
+Work with complex nested structures:
+
+```python
+from sarvam import SarvamChat
+from langchain_core.messages import HumanMessage
+from pydantic import BaseModel
+
+class Address(BaseModel):
+    """Address model."""
+    street: str
+    city: str
+    country: str
+    zipcode: str
+
+class Company(BaseModel):
+    """Company model with nested address."""
+    name: str
+    industry: str
+    employee_count: int
+    headquarters: Address
+
+chat = SarvamChat(temperature=0.3)
+
+response = chat.invoke([HumanMessage(content="""
+Extract company information and return as JSON:
+Text: TechCorp India is a software development company with 250 employees.
+Their headquarters is at 123 MG Road, Bengaluru, India, 560001.
+
+Return JSON with: name, industry, employee_count, headquarters (object with street, city, country, zipcode)
+""")])
+
+# Parse into nested Pydantic models
+from sarvam import parse_structured_output
+company = parse_structured_output(response.content, Company)
+
+print(company.name)                    # TechCorp India
+print(company.employee_count)          # 250
+print(company.headquarters.city)       # Bengaluru
+print(company.headquarters.country)    # India
+```
+
+#### Manual JSON Extraction
+
+For more control, use the utility functions directly:
+
+```python
+from sarvam import SarvamChat, parse_json_response
+from langchain_core.messages import HumanMessage
+
+chat = SarvamChat()
+
+response = chat.invoke([HumanMessage(content="""
+Return the following data as JSON:
+Name: Raj Kumar
+Age: 28
+City: Mumbai
+""")])
+
+# Extract JSON (handles markdown blocks and reasoning text)
+data = parse_json_response(response.content)
+print(data["name"])  # Raj Kumar
+```
+
+**Note**: Sarvam AI may include reasoning text before the JSON output, especially with `reasoning_effort="high"` (default). The utility functions automatically handle this and extract the JSON portion.
+
+#### Task Planning
+
+Generate structured TODO lists from user requests - perfect for breaking down complex tasks into actionable steps:
+
+**Quick Example:**
+
+```python
+from sarvam import SarvamChat, parse_structured_output
+from langchain_core.messages import HumanMessage
+from pydantic import BaseModel
+
+class TodoItem(BaseModel):
+    title: str
+    description: str
+
+class TodoList(BaseModel):
+    todos: list[TodoItem]
+
+chat = SarvamChat(reasoning_effort="low", temperature=0.3)
+
+# Simple task planning
+response = chat.invoke([HumanMessage(content="""
+Convert this task into a JSON TODO list with 2-4 items:
+'Organize a bookshelf by genre and author'
+
+Return format: {"todos": [{"title": "...", "description": "..."}]}
+""")])
+
+todo_list = parse_structured_output(response.content, TodoList)
+
+for i, todo in enumerate(todo_list.todos, 1):
+    print(f"{i}. {todo.title}")
+```
+
+**Advanced Example:**
+
+Generate structured TODO lists from user requests:
+
+```python
+from sarvam import SarvamChat, parse_structured_output
+from langchain_core.messages import HumanMessage
+from pydantic import BaseModel
+
+class TodoItem(BaseModel):
+    """A single TODO item."""
+    title: str
+    description: str
+
+class TodoList(BaseModel):
+    """A list of TODO items."""
+    todos: list[TodoItem]
+
+chat = SarvamChat(reasoning_effort="low", temperature=0.3)
+
+response = chat.invoke([HumanMessage(content="""
+You are a task-planning assistant. Analyze the user's task.
+
+Your goal is to convert a user request into a clear, actionable TODO list.
+Plan at the minimum sufficient granularity.
+
+Rules:
+- If the task is simple or routine → generate 2–4 TODOs
+- If the task is moderately complex → generate 4–6 TODOs
+- If the task is complex or multi-stage → rarely generate 7–10 TODOs
+- Titles must be concise (≤ 10 words)
+- Descriptions must be concrete and outcome-oriented
+
+Your output must be JSON with this structure:
+{
+  "todos": [
+    {
+      "title": "Short task title",
+      "description": "Detailed description of what needs to be done"
+    }
+  ]
+}
+
+Task: Analyze recent gold price surge globally
+""")])
+
+# Parse into structured TODO list
+todo_list = parse_structured_output(response.content, TodoList)
+
+# Display the generated TODOs
+for i, todo in enumerate(todo_list.todos, 1):
+    print(f"{i}. {todo.title}")
+    print(f"   {todo.description}\n")
+```
+
+Example output:
+```
+1. Identify key economic indicators
+   Analyze inflation rates, interest rates, and currency fluctuations affecting gold prices
+
+2. Research geopolitical factors
+   Examine international conflicts and trade tensions impacting gold demand
+
+3. Study market sentiment data
+   Assess investor behavior and trading volume patterns in gold markets
+
+4. Review central bank policies
+   Analyze Federal Reserve and global central bank actions on gold reserves
+```
+
+**Tip**: Use `reasoning_effort="low"` for more direct responses without extensive reasoning text.
+
 ## Parameters
 
 | Parameter | Type | Default | Description |
