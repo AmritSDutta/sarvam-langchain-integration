@@ -7,6 +7,12 @@
 
 LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM with native support for Hindi and other Indic languages.
 
+## ⚠️ AI-Assisted Development Disclaimer
+
+**~95% of this codebase was written by AI coding agents** (primarily [Claude Code](https://claude.ai/code)) with architectural guidance and review via GEMINI CLI.
+
+This project demonstrates modern AI-assisted software development practices, with human oversight ensuring code quality, security, and functionality alignment. All code has been tested and reviewed before publication.
+
 ## ✨ Features
 
 - 🤖 **SarvamLLM** - Simple prompt-response interface
