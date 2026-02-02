@@ -7,20 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Task planning functionality with structured JSON output
-- Utility functions for JSON extraction from AI responses
-- Support for nested Pydantic models in structured output
-- Comprehensive test suite with 42+ unit tests
-
-### Changed
-- Refactored package structure: moved `chat.py` and `llm.py` into `chat/` subpackage
-- Improved JSON extraction with brace counting for nested objects
-- Renamed package from `sarvam-langchain-integration` to `langchain-sarvam-integration`
+## [0.1.1] - 2026-02-02
 
 ### Fixed
-- License format deprecation warnings (SPDX expression)
-- Removed deprecated license classifier
+- **Critical bug**: Fixed capability inference failure where `SarvamChat.invoke()` and `SarvamChat.ainvoke()` would crash with `'str' object has no attribute 'content'` error when passed plain string input instead of `BaseMessage` objects
+- Updated `_convert_messages()` method to handle string inputs gracefully by wrapping them as user messages
+- Added support for string items in message lists
+- Updated type hints to reflect `Union[List[BaseMessage], str]` input support
+
+### Added
+- 6 new test cases for string input handling:
+  - `test_chat_invoke_with_string` - Sync invoke with plain string
+  - `test_chat_invoke_with_list_containing_strings` - List with string items
+  - `test_chat_invoke_with_mixed_messages_and_strings` - Mixed BaseMessage and strings
+  - `test_ainvoke_with_string_input` - Async invoke with plain string
+  - `test_capability_inference_pattern` - Mocked capability inference pattern test
+  - `test_capability_inference_with_real_api` - Real API integration test
+
+### Test Results
+- All 53 unit tests passing
+- Integration test verified with real Sarvam AI API call
 
 ## [0.1.0] - 2026-02-02
 
@@ -43,5 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool/function calling is implemented for future compatibility but not yet supported by Sarvam AI API
 - Streaming is not yet supported by Sarvam AI API
 
-[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/your-username/langchain-sarvam-integration/releases/tag/v0.1.0
