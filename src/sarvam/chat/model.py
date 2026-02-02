@@ -71,23 +71,32 @@ class SarvamChat(BaseChatModel):
         """Return type of LLM."""
         return "sarvam-chat"
 
-    def _convert_messages(self, messages: List[BaseMessage]) -> List[Dict[str, str]]:
-        """Convert LangChain messages to Sarvam format."""
+    def _convert_messages(self, messages: Union[List[BaseMessage], str]) -> List[Dict[str, str]]:
+        """Convert LangChain messages or string to Sarvam format."""
+        # Handle string input - wrap in user message
+        if isinstance(messages, str):
+            return [{"role": "user", "content": messages}]
+
         converted = []
         for msg in messages:
-            if isinstance(msg, HumanMessage):
+            # Handle string items in list
+            if isinstance(msg, str):
+                converted.append({"role": "user", "content": msg})
+            elif isinstance(msg, HumanMessage):
                 converted.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
                 converted.append({"role": "assistant", "content": msg.content})
             elif isinstance(msg, SystemMessage):
                 converted.append({"role": "system", "content": msg.content})
             else:
-                converted.append({"role": "user", "content": str(msg.content)})
+                # Fallback for unknown message types
+                content = msg if isinstance(msg, str) else getattr(msg, "content", str(msg))
+                converted.append({"role": "user", "content": str(content)})
         return converted
 
     def _generate(
         self,
-        messages: List[BaseMessage],
+        messages: Union[List[BaseMessage], str],
         stop: List[str] | None = None,
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
@@ -214,7 +223,7 @@ class SarvamChat(BaseChatModel):
     @override
     async def ainvoke(
         self,
-        input: List[BaseMessage],
+        input: Union[List[BaseMessage], str],
         config: Optional[RunnableConfig] = None,
         *,
         stop: Optional[List[str]] = None,

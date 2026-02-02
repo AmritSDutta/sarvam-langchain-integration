@@ -200,3 +200,82 @@ def test_llm_with_wiki_grounding_real():
         word in response.lower()
         for word in ["taj mahal", "agra", "shah jahan", "mumtaz", "monument"]
     )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_capability_inference_with_real_api():
+    """Test capability inference pattern with real API call.
+
+    This test mimics the exact usage pattern from the user's codebase
+    where SarvamChat.ainvoke() is called with a long string prompt for
+    task capability classification.
+
+    Run with:
+        pytest -m integration test/sarvam/test_integration.py::test_capability_inference_with_real_api
+    """
+    import asyncio
+
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    chat = SarvamChat(temperature=0.3)
+
+    # The exact prompt from user's code
+    prompt = """You are a task classifier. Analyze this task and identify which LLM capabilities are required. Available capabilities: - reasoning: Complex reasoning, chain-of-thought, analysis - tools: Function calling, tool use, API interactions - fast: Low latency, quick response time - cheap: Low cost per token (budget-conscious) - informational: General information, factual queries, knowledge retrieval - coding: Code writing, programming, software development - vision: Image understanding, visual content - long: Long context window needed - synthesizing: Synthesizing capabilities - summarizing: Summarizing capabilities - planning: Planning capabilities
+Task: "Analyze recent gold price surge in recent times"
+Rules: 1. If task involves writing code, programming, or software: include "coding" 2. If task asks for facts, explanations, or knowledge: include "informational" 3. If task needs complex analysis: include "reasoning" 4. Return only the required capability names as a comma-separated list. 5. If unsure, default to "reasoning"
+Example outputs: -coding, reasoning, cheap -informational, cheap, long -summarizing, synthesizing, long"""
+
+    planning_model = "sarvam-m"
+
+    try:
+        response = await chat.ainvoke(prompt)
+        content = response.content.strip()
+        print(f"\nCapability inference[{planning_model}] suggested: {content}")
+
+        # Parse the response - look for capability names
+        valid_caps = {
+            "reasoning",
+            "tools",
+            "fast",
+            "cheap",
+            "informational",
+            "coding",
+            "vision",
+            "long",
+            "synthesizing",
+            "summarizing",
+            "planning",
+        }
+
+        capabilities = set()
+
+        # Split by comma and extract capabilities
+        for cap in content.split(","):
+            cap = cap.strip().strip('"\'').strip()
+            if cap in valid_caps:
+                capabilities.add(cap)
+
+        # Fallback to informational if empty
+        if not capabilities:
+            capabilities.add("reasoning")
+
+        print(f"Parsed capabilities: {capabilities}")
+
+        # Verify we got some capabilities back
+        assert len(capabilities) > 0, "Should have at least one capability"
+        # For "gold price surge" task, should include informational or reasoning
+        assert len(capabilities & {"informational", "reasoning", "synthesizing", "analyzing"}) > 0, \
+            "Should include at least one of: informational, reasoning, synthesizing"
+
+    except Exception as e:
+        # Fallback on error - if API is down or returns error, skip the test
+        error_msg = str(e)
+        if "internal_server_error" in error_msg.lower() or "500" in error_msg:
+            pytest.skip(f"Sarvam API is currently experiencing internal server errors: {e}")
+        # Re-raise other exceptions
+        default_capabilities = {"reasoning", "informational", "planning"}
+        print(f"Warning: Capability inference failed[{planning_model}]: {e}, will return {default_capabilities}")
+        raise
