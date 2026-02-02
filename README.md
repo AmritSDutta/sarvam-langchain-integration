@@ -1,11 +1,26 @@
-# Sarvam LangChain Integration
+# langchain-sarvam-integration
+
+[![PyPI Version](https://img.shields.io/pypi/v/langchain-sarvam-integration)](https://pypi.org/project/langchain-sarvam-integration/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/langchain-sarvam-integration)](https://pypi.org/project/langchain-sarvam-integration/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Tests](https://github.com/your-username/langchain-sarvam-integration/workflows/Tests/badge.svg)](https://github.com/your-username/langchain-sarvam-integration/actions)
 
 LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM with native support for Hindi and other Indic languages.
+
+## ✨ Features
+
+- 🤖 **SarvamLLM** - Simple prompt-response interface
+- 💬 **SarvamChat** - Multi-turn conversation support
+- 🧠 **Reasoning Mode** - Built-in thinking capability
+- 📚 **Wiki Grounding** - Factual query enhancement
+- 🇮🇳 **Hindi & Indic Languages** - Native language support
+- 📝 **Structured Output** - JSON extraction with Pydantic support
+- 🔧 **Task Planning** - Automatic TODO list generation
 
 ## Installation
 
 ```bash
-pip install sarvam-langchain-integration
+pip install langchain-sarvam-integration
 ```
 
 Or install from source:
@@ -406,13 +421,34 @@ Format code:
 ruff format .
 ```
 
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Community
+
+- 🐛 **Bug Reports**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=bug_report.md)
+- 💡 **Feature Requests**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=feature_request.md)
+- ❓ **Questions**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=question.md)
+- 📖 **Code of Conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- 🔒 **Security Policy**: [SECURITY.md](SECURITY.md)
+
 ## License
 
 MIT License - Copyright (c) 2026 AMRIT SHANKAR DUTTA
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
 
 ## Links
 
 - [Sarvam AI Documentation](https://docs.sarvam.ai/)
 - [Sarvam-M Model](https://docs.sarvam.ai/api-reference-docs/getting-started/models/sarvam-m)
 - [LangChain Documentation](https://python.langchain.com/)
+- [PyPI Package](https://pypi.org/project/langchain-sarvam-integration/)
+
+---
+
+*Made with ❤️ for the LangChain community*
 
