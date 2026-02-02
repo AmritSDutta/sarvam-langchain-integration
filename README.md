@@ -153,10 +153,28 @@ print(response.content)
 |-----------|------|---------|-------------|
 | `api_key` | `str` | `None` | Sarvam API key (or use `SARVAM_API_KEY` env var) |
 | `model` | `str` | `"sarvam-m"` | Model to use |
-| `temperature` | `float` | `0.7` | Sampling temperature (0-2) |
-| `top_p` | `float` | `None` | Nucleus sampling (0-1) |
-| `reasoning_effort` | `str` | `None` | Reasoning level: `"low"`, `"medium"`, `"high"` |
-| `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
+| `temperature` | `float` | `0.5` | Sampling temperature (0-2) |
+| `top_p` | `float` | `1.0` | Nucleus sampling (0-1) |
+| `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
+| `wiki_grounding` | `bool` | `True` | Enable wiki grounding for factual queries |
+
+## Limitations
+
+**Tool/Function Calling**: The `bind_tools()` method is implemented for future compatibility, but **Sarvam AI does not currently support tool or function calling** in their API. When you bind tools, they will be stored but a warning will be issued indicating that the API won't use them. This feature will automatically work when Sarvam adds tool calling support.
+
+```python
+from sarvam import SarvamChat
+from langchain_core.tools import tool
+
+@tool
+def search(query: str) -> str:
+    """Search the web."""
+    return f"Results for: {query}"
+
+chat = SarvamChat()
+bound_chat = chat.bind_tools([search])
+# Warning: Sarvam AI does not support tool/function calling yet
+```
 
 ## Development
 

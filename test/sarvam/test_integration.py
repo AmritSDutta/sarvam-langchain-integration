@@ -1,4 +1,3 @@
-
 """Integration tests for Sarvam API calls.
 
 These tests make real API calls to Sarvam and require:
@@ -14,8 +13,9 @@ import os
 
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 
-from src.sarvam import SarvamLLM, SarvamChat
+from sarvam import SarvamLLM, SarvamChat
 
 
 @pytest.mark.integration
@@ -33,6 +33,48 @@ def test_llm_invoke_real():
     assert len(response) > 0
     # Check that response contains something relevant
     assert any(word in response.lower() for word in ["delhi", "capital"])
+
+
+@pytest.mark.integration
+def test_llm_invoke_tools():
+    """Test Chat style invocation with tools and real API call.
+
+    Note: Sarvam AI does NOT support tool/function calling yet.
+    This test verifies that bind_tools() works and logs appropriately.
+    """
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Enable logging to see INFO level messages
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
+    @tool
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        print(f"[get_weather()] Getting weather for {location}")
+        return f"Sunny and 75°F in {location}"
+
+    chat = SarvamChat()
+    bound_chat = chat.bind_tools([get_weather])
+
+    # Verify tools are bound (stored but not used by API)
+    assert bound_chat.bound_tools is not None
+    assert len(bound_chat.bound_tools) == 1
+    print(f"[OK] Bound tool: {bound_chat.bound_tools[0]['name']}")
+
+    # Invoke - should log INFO message about tools not being supported
+    response = bound_chat.invoke([HumanMessage(content="What is the weather in Delhi?")])
+
+    assert response is not None
+    assert response.content is not None
+    assert isinstance(response.content, str)
+    assert len(response.content) > 0
+
+    print(f"Response: {response.content}")
+    # Model should answer directly (not using tools)
+    assert any(word in response.content.lower() for word in ["delhi", "weather", "temperature", "india"])
 
 
 @pytest.mark.integration

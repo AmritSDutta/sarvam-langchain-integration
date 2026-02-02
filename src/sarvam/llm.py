@@ -10,6 +10,8 @@ from pydantic import Field, SecretStr
 from sarvamai import SarvamAI
 from sarvamai.core.api_error import ApiError
 
+from sarvam.sarvam_logging import logger
+
 
 class SarvamLLM(BaseLLM):
     """Sarvam LLM wrapper for LangChain.
@@ -26,13 +28,13 @@ class SarvamLLM(BaseLLM):
 
     api_key: Optional[SecretStr] = Field(default=None, description="Sarvam API subscription key")
     model: str = Field(default="sarvam-m", description="Model name to use")
-    temperature: float = Field(default=0.7, ge=0, le=2, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0, le=1, description="Nucleus sampling")
+    temperature: float = Field(default=0.5, ge=0, le=2, description="Sampling temperature")
+    top_p: Optional[float] = Field(default=1.0, ge=0, le=1, description="Nucleus sampling")
     reasoning_effort: Optional[str] = Field(
-        default=None,
+        default="high",
         description="Reasoning effort: low, medium, or high",
     )
-    wiki_grounding: bool = Field(default=False, description="Enable wiki grounding")
+    wiki_grounding: bool = Field(default=True, description="Enable wiki grounding")
 
     _client: Optional[SarvamAI] = None
 
@@ -83,10 +85,28 @@ class SarvamLLM(BaseLLM):
         # Override with any additional kwargs
         params.update(kwargs)
 
+        # Log API call at DEBUG level
+        logger.debug(
+            f"Calling Sarvam API: model={self.model}, "
+            f"prompt_length={len(prompt)}, "
+            f"temperature={self.temperature}, "
+            f"reasoning_effort={self.reasoning_effort}, "
+            f"wiki_grounding={self.wiki_grounding}"
+        )
+
         try:
             response = self._client.chat.completions(**params)
         except ApiError as e:
+            logger.error(f"Sarvam API error: {e.body}")
             raise RuntimeError(f"Sarvam API error: {e.body}") from e
+
+        # Log token usage at DEBUG level
+        if hasattr(response, "usage"):
+            logger.debug(
+                f"Token usage: prompt={response.usage.prompt_tokens}, "
+                f"completion={response.usage.completion_tokens}, "
+                f"total={response.usage.total_tokens}"
+            )
 
         return response.choices[0].message.content
 

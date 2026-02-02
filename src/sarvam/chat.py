@@ -1,15 +1,24 @@
 """Sarvam Chat Model implementation for LangChain."""
+import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
+from langchain_core.runnables import Runnable
+from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_function
 from pydantic import Field, SecretStr
 
 from sarvamai import SarvamAI
 from sarvamai.core.api_error import ApiError
+
+from sarvam.sarvam_logging import logger
+
+# Constants for feature limitations
+_FEATURE_TOOLS_NOT_SUPPORTED = "tools_not_supported"
 
 
 class SarvamChat(BaseChatModel):
@@ -27,13 +36,16 @@ class SarvamChat(BaseChatModel):
 
     api_key: Optional[SecretStr] = Field(default=None, description="Sarvam API subscription key")
     model: str = Field(default="sarvam-m", description="Model name to use")
-    temperature: float = Field(default=0.7, ge=0, le=2, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0, le=1, description="Nucleus sampling")
+    temperature: float = Field(default=0.5, ge=0, le=2, description="Sampling temperature")
+    top_p: Optional[float] = Field(default=1.0, ge=0, le=1, description="Nucleus sampling")
     reasoning_effort: Optional[str] = Field(
-        default=None,
+        default="high",
         description="Reasoning effort: low, medium, or high",
     )
-    wiki_grounding: bool = Field(default=False, description="Enable wiki grounding")
+    wiki_grounding: bool = Field(default=True, description="Enable wiki grounding")
+    bound_tools: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Tools bound to this model instance"
+    )
 
     _client: Optional[SarvamAI] = None
 
@@ -95,17 +107,47 @@ class SarvamChat(BaseChatModel):
         if self.wiki_grounding:
             params["wiki_grounding"] = True
 
-        # Override with any additional kwargs
-        params.update(kwargs)
+        # Note: Sarvam API does not support tools/function calling yet
+        # Tools are stored in bound_tools but not passed to API
+        # This is for future compatibility when Sarvam adds support
+        if self.bound_tools:
+            logger.info(
+                "Sarvam AI does not support tool/function calling yet. "
+                "Tools are bound but will not be used by the API. "
+                "This feature is for future compatibility."
+            )
+            logger.debug(f"Bound tools (not used): {[t.get('name') for t in self.bound_tools]}")
+
+        # Override with any additional kwargs (but exclude tools)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+        params.update(filtered_kwargs)
+
+        # Log API call at DEBUG level
+        logger.debug(
+            f"Calling Sarvam API: model={self.model}, "
+            f"messages={len(params['messages'])}, "
+            f"temperature={self.temperature}, "
+            f"reasoning_effort={self.reasoning_effort}, "
+            f"wiki_grounding={self.wiki_grounding}"
+        )
 
         try:
             response = self._client.chat.completions(**params)
         except ApiError as e:
+            logger.error(f"Sarvam API error: {e.body}")
             raise RuntimeError(f"Sarvam API error: {e.body}") from e
 
         # Extract response
         message = response.choices[0].message
         content = message.content
+
+        # Log token usage at DEBUG level
+        if hasattr(response, "usage"):
+            logger.debug(
+                f"Token usage: prompt={response.usage.prompt_tokens}, "
+                f"completion={response.usage.completion_tokens}, "
+                f"total={response.usage.total_tokens}"
+            )
 
         generation = ChatGeneration(message=AIMessage(content=content))
 
@@ -130,3 +172,39 @@ class SarvamChat(BaseChatModel):
             "reasoning_effort": self.reasoning_effort,
             "wiki_grounding": self.wiki_grounding,
         }
+
+    def bind_tools(
+        self,
+        tools: Sequence[Union[Dict[str, Any], type, BaseTool, callable]],
+        **kwargs: Any,
+    ) -> Runnable[Any, Any]:
+        """Bind tools to the chat model.
+
+        Args:
+            tools: A list of tools to bind to the model. Can be:
+                - Dictionaries following OpenAI function format
+                - BaseTool instances
+                - Python functions
+            **kwargs: Additional arguments to pass
+
+        Returns:
+            A new Runnable with tools bound
+        """
+        # Convert tools to OpenAI function format
+        formatted_tools = []
+        for tool in tools:
+            if isinstance(tool, dict):
+                formatted_tools.append(tool)
+            elif isinstance(tool, BaseTool):
+                formatted_tools.append(convert_to_openai_function(tool))
+            else:
+                formatted_tools.append(convert_to_openai_function(tool))
+
+        # Create a new instance with tools bound
+        bound_params = {
+            **self._identifying_params,
+            "api_key": self.api_key,
+            "bound_tools": formatted_tools,
+            **kwargs,
+        }
+        return self.__class__(**bound_params)

@@ -3,13 +3,12 @@
 from unittest.mock import Mock, patch
 
 from langchain_core.messages import HumanMessage
-
-from src.sarvam import SarvamChat
+from sarvam import SarvamChat
 
 
 def test_chat_invoke():
     """Test Chat style invocation."""
-    with patch("src.sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
         # Mock the API response structure
         mock_message = Mock()
         mock_message.content = "Hello! How can I help you?"
@@ -35,7 +34,7 @@ def test_chat_invoke():
 
 def test_chat_with_temperature():
     """Test Chat with custom temperature."""
-    with patch("src.sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
@@ -56,7 +55,7 @@ def test_chat_with_temperature():
 
 def test_chat_with_reasoning_effort():
     """Test Chat with reasoning effort enabled."""
-    with patch("src.sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Reasoned response"
         mock_choice = Mock()
@@ -77,7 +76,7 @@ def test_chat_with_reasoning_effort():
 
 def test_chat_with_wiki_grounding():
     """Test Chat with wiki grounding enabled."""
-    with patch("src.sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Factual answer"
         mock_choice = Mock()
@@ -98,7 +97,7 @@ def test_chat_with_wiki_grounding():
 
 def test_chat_with_top_p():
     """Test Chat with top_p parameter."""
-    with patch("src.sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
