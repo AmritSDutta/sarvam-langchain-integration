@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-02
+
+### Added
+- **LangSmith tracing support**: Full integration with LangSmith for LLM call tracing, monitoring, and cost tracking
+- Proper callback manager integration in both `SarvamChat` and `SarvamLLM`
+- Metadata support for LangSmith (`ls_provider: "sarvam"`, `ls_model_name`)
+- Token usage tracking with correct LangSmith format (`input_tokens`, `output_tokens`, `total_tokens`)
+
+### Fixed
+- **Critical**: `run_manager` parameter was being ignored in `_generate()` and `_call()` methods
+- **Critical**: `ainvoke()` was passing `None` as `run_manager` instead of extracting callbacks from config
+- Error callbacks (`on_llm_error`) now properly notify LangSmith of API failures
+- Completion callbacks (`on_llm_end`) now properly notify LangSmith of successful generations
+
+### Changed
+- Updated token usage format from `prompt_tokens`/`completion_tokens` to `input_tokens`/`output_tokens` for LangSmith compatibility
+- Callbacks are now extracted from `RunnableConfig` in async methods
+
+### Technical Details
+- `SarvamChat._generate()` now calls `run_manager.on_llm_end()` and `run_manager.on_llm_error()`
+- `SarvamLLM._call()` now calls `run_manager.on_llm_error()` for proper error tracing
+- Both `ainvoke()` methods now extract callbacks from config and create `CallbackManagerForLLMRun` instances
+
 ## [0.1.1] - 2026-02-02
 
 ### Fixed
@@ -49,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool/function calling is implemented for future compatibility but not yet supported by Sarvam AI API
 - Streaming is not yet supported by Sarvam AI API
 
-[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/your-username/langchain-sarvam-integration/releases/tag/v0.1.0

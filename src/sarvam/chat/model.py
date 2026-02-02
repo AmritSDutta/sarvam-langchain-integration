@@ -105,6 +105,13 @@ class SarvamChat(BaseChatModel):
         if self._client is None:
             self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
 
+        # Set LangSmith metadata for tracing
+        if run_manager:
+            run_manager.metadata.update({
+                "ls_provider": "sarvam",
+                "ls_model_name": self.model,
+            })
+
         # Build request parameters
         params: Dict[str, Any] = {
             "messages": self._convert_messages(messages),
@@ -145,6 +152,9 @@ class SarvamChat(BaseChatModel):
         try:
             response = self._client.chat.completions(**params)
         except ApiError as e:
+            # Notify LangSmith of error
+            if run_manager:
+                run_manager.on_llm_error(e)
             logger.error(f"Sarvam API error: {e.body}")
             raise RuntimeError(f"Sarvam API error: {e.body}") from e
 
@@ -152,24 +162,44 @@ class SarvamChat(BaseChatModel):
         message = response.choices[0].message
         content = message.content
 
+        # Build token usage info if available (for LangSmith and response metadata)
+        token_usage = None
+        usage_metadata = None
+        if hasattr(response, "usage") and response.usage:
+            # Extract token counts, handling both real and mocked responses
+            input_tokens = getattr(response.usage, "prompt_tokens", 0)
+            output_tokens = getattr(response.usage, "completion_tokens", 0)
+            total_tokens = getattr(response.usage, "total_tokens", 0)
+
+            # Only include if values are actual integers (not Mock objects)
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int) and isinstance(total_tokens, int):
+                token_usage = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                }
+                # Also set usage_metadata for the AIMessage (LangChain 0.1+)
+                usage_metadata = token_usage.copy()
+
         # Log token usage at DEBUG level
-        if hasattr(response, "usage"):
+        if token_usage:
             logger.debug(
-                f"Token usage: prompt={response.usage.prompt_tokens}, "
-                f"completion={response.usage.completion_tokens}, "
-                f"total={response.usage.total_tokens}"
+                f"Token usage: prompt={token_usage['input_tokens']}, "
+                f"completion={token_usage['output_tokens']}, "
+                f"total={token_usage['total_tokens']}"
             )
 
-        generation = ChatGeneration(message=AIMessage(content=content))
+        # Create AIMessage with usage_metadata (only if we have actual integer values)
+        generation = ChatGeneration(
+            message=AIMessage(
+                content=content,
+                **({"usage_metadata": usage_metadata} if usage_metadata else {})
+            )
+        )
 
-        # Build token usage info if available
-        token_usage = None
-        if hasattr(response, "usage"):
-            token_usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+        # Notify LangSmith of completion
+        if run_manager:
+            run_manager.on_llm_end(ChatResult(generations=[generation], llm_output={"token_usage": token_usage}))
 
         return ChatResult(generations=[generation], llm_output={"token_usage": token_usage})
 
@@ -246,11 +276,6 @@ class SarvamChat(BaseChatModel):
             _generate method in a separate thread, preventing blocking
             of the event loop.
         """
-        result = await asyncio.to_thread(
-            self._generate,
-            input,
-            stop,
-            None,  # run_manager
-            **kwargs,
-        )
-        return result.generations[0].message
+        # Use the parent class's ainvoke which handles callbacks properly
+        # The parent will call our _generate method with the correct run_manager
+        return await super().ainvoke(input, config, stop=stop, **kwargs)

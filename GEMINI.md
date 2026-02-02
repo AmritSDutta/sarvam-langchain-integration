@@ -7,7 +7,7 @@ This project is a Python library that integrates the [Sarvam AI](https://sarvam.
 The library provides two main components:
 
 *   `SarvamLLM`: A wrapper for single-turn, prompt-response interactions with the Sarvam AI API.
-*   `SarvamChat`: A wrapper for multi-turn conversations, allowing for more complex and stateful interactions.
+*   `SarvamChat`: A wrapper for multi-turn conversations, allowing for more complex and stateful interactions. It supports `SystemMessage`, `HumanMessage` and `AIMessage` objects.
 
 The integration supports several advanced features, including:
 
@@ -15,6 +15,8 @@ The integration supports several advanced features, including:
 *   **Wiki Grounding**: Enhance factual queries with information from Wikipedia.
 *   **Structured Output**: Extract information in JSON format, with support for Pydantic models.
 *   **Task Planning**: Generate TODO lists from user requests.
+*   **Async Operations**: Asynchronous support for non-blocking calls.
+*   **Tool Binding**: Bind tools to the chat model for future compatibility.
 
 ## Building and Running
 
@@ -29,8 +31,8 @@ pip install langchain-sarvam-integration
 To install from source for development:
 
 ```bash
-git clone https://github.com/yourusername/sarvam_lanchchain_integration.git
-cd sarvam_lanchchain_integration
+git clone https://github.com/sarvamai/sarvam-langchain.git
+cd sarvam-langchain
 pip install -e ".[dev]"
 ```
 
@@ -44,7 +46,152 @@ export SARVAM_API_KEY="your-api-key-here"
 
 Alternatively, you can pass the API key directly when initializing the `SarvamLLM` or `SarvamChat` classes.
 
-### Running Tests
+## Usage
+
+### SarvamLLM
+
+```python
+from langchain_sarvam_integration import SarvamLLM
+
+llm = SarvamLLM(model="sarvam-m")
+response = llm.invoke("What is the capital of India?")
+print(response)
+```
+
+### SarvamChat
+
+```python
+from langchain_sarvam_integration import SarvamChat
+from langchain_core.messages import HumanMessage, SystemMessage
+
+chat = SarvamChat(model="sarvam-m")
+messages = [
+    SystemMessage(content="You are a helpful assistant."),
+    HumanMessage(content="What is the weather like in Bangalore?"),
+]
+response = chat.invoke(messages)
+print(response.content)
+```
+
+## Advanced Features
+
+### Async Operations
+
+The library supports asynchronous operations using `ainvoke`.
+
+```python
+import asyncio
+from langchain_sarvam_integration import SarvamChat
+from langchain_core.messages import HumanMessage
+
+async def main():
+    chat = SarvamChat(model="sarvam-m")
+    response = await chat.ainvoke([HumanMessage(content="Tell me a joke.")])
+    print(response.content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Structured Output
+
+You can request the model to return a JSON object and parse it into a Pydantic model.
+
+```python
+from langchain_sarvam_integration import SarvamChat
+from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
+
+class Person(BaseModel):
+    name: str
+    age: int
+
+chat = SarvamChat()
+prompt = """
+Extract the person's name and age from the following sentence and return it as a JSON object:
+'John is 30 years old.'
+"""
+response = chat.invoke([HumanMessage(content=prompt)])
+person = Person.model_validate_json(response.content)
+print(person)
+```
+
+### Task Planning
+
+The library can be used to generate a TODO list from a user's request.
+
+```python
+from langchain_sarvam_integration import SarvamChat
+from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
+
+class TodoItem(BaseModel):
+    title: str
+    description: str
+
+class TodoList(BaseModel):
+    todos: list[TodoItem]
+
+TASK_PLANNING_PROMPT = """You are a task-planning assistant.Analyze the user's task.
+
+Your goal is to convert a user request into a clear, actionable TODO list.
+Plan at the *minimum sufficient granularity*.
+You must perform all internal reasoning, task planning, and intermediate steps in English only.
+
+Rules:
+- If the task is simple or routine → generate 2–4 TODOs.
+- If the task is moderately complex → generate 4–6 TODOs.
+- If the task is complex or multi-stage → rarely generate 7–10 TODOs (hard cap).
+- Rarely exceed 7 TODO items.
+- Avoid trivial or redundant steps.
+- Each TODO must represent a meaningful unit of work.
+- Titles must be concise (≤ 10 words).
+- Descriptions must be concrete and outcome-oriented.
+- Do not expose reasoning, analysis, or meta commentary.
+
+Your output must be JSON with this structure:
+    {{
+      "todos": [
+        {{
+          "title": "Short task title",
+          "description": "Detailed description of what needs to be done"
+        }},
+        {{
+          "title": "Another task",
+          "description": "Another detailed description"
+        }}
+      ]
+    }}
+
+Generate 2-10 meaningful TODO items based on the user's task.
+
+Task: {task}"""
+
+chat = SarvamChat()
+prompt = TASK_PLANNING_PROMPT.format(task="Plan a trip to Goa")
+response = chat.invoke([HumanMessage(content=prompt)])
+todo_list = TodoList.model_validate_json(response.content)
+print(todo_list)
+```
+
+### Tool Binding
+
+You can bind tools to the chat model. Note that while you can bind tools, the underlying Sarvam AI API does not yet support tool or function calling. This feature is for future compatibility.
+
+```python
+from langchain_sarvam_integration import SarvamChat
+from langchain_core.tools import tool
+
+@tool
+def multiply(a: int, b: int) -> int:
+    """Multiply two numbers."""
+    return a * b
+
+chat = SarvamChat()
+chat_with_tools = chat.bind_tools([multiply])
+```
+
+## Running Tests
 
 To run the test suite, use the following command:
 

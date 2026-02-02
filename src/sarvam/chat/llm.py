@@ -55,6 +55,7 @@ class SarvamLLM(BaseLLM):
 
         super().__init__(**kwargs)
         self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
+        self._last_token_usage = None  # For LangSmith token usage tracking
 
     @property
     def _llm_type(self) -> str:
@@ -71,6 +72,13 @@ class SarvamLLM(BaseLLM):
         """Call the Sarvam API."""
         if self._client is None:
             self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
+
+        # Set LangSmith metadata for tracing
+        if run_manager:
+            run_manager.metadata.update({
+                "ls_provider": "sarvam",
+                "ls_model_name": self.model,
+            })
 
         # Build request parameters
         params: Dict[str, Any] = {
@@ -100,16 +108,37 @@ class SarvamLLM(BaseLLM):
         try:
             response = self._client.chat.completions(**params)
         except ApiError as e:
+            # Notify LangSmith of error
+            if run_manager:
+                run_manager.on_llm_error(e)
             logger.error(f"Sarvam API error: {e.body}")
             raise RuntimeError(f"Sarvam API error: {e.body}") from e
 
+        # Extract token usage for LangSmith tracing
+        token_usage = None
+        if hasattr(response, "usage") and response.usage:
+            input_tokens = getattr(response.usage, "prompt_tokens", 0)
+            output_tokens = getattr(response.usage, "completion_tokens", 0)
+            total_tokens = getattr(response.usage, "total_tokens", 0)
+
+            # Only include if values are actual integers
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int) and isinstance(total_tokens, int):
+                token_usage = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                }
+
         # Log token usage at DEBUG level
-        if hasattr(response, "usage"):
+        if token_usage:
             logger.debug(
-                f"Token usage: prompt={response.usage.prompt_tokens}, "
-                f"completion={response.usage.completion_tokens}, "
-                f"total={response.usage.total_tokens}"
+                f"Token usage: prompt={token_usage['input_tokens']}, "
+                f"completion={token_usage['output_tokens']}, "
+                f"total={token_usage['total_tokens']}"
             )
+
+        # Store token_usage as an instance variable for _generate to access
+        self._last_token_usage = token_usage
 
         return response.choices[0].message.content
 
@@ -122,10 +151,31 @@ class SarvamLLM(BaseLLM):
     ) -> LLMResult:
         """Generate from LLM."""
         generations = []
+        token_usage_sum = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+
         for prompt in prompts:
             text = self._call(prompt, stop, run_manager, **kwargs)
             generations.append([Generation(text=text)])
-        return LLMResult(generations=generations)
+
+            # Accumulate token usage
+            if hasattr(self, '_last_token_usage') and self._last_token_usage:
+                token_usage_sum["input_tokens"] += self._last_token_usage["input_tokens"]
+                token_usage_sum["output_tokens"] += self._last_token_usage["output_tokens"]
+                token_usage_sum["total_tokens"] += self._last_token_usage["total_tokens"]
+
+        # Notify LangSmith of completion with token usage
+        if run_manager:
+            llm_result = LLMResult(
+                generations=generations,
+                llm_output={"token_usage": token_usage_sum} if any(token_usage_sum.values()) else None
+            )
+            run_manager.on_llm_end(llm_result)
+            return llm_result
+
+        return LLMResult(
+            generations=generations,
+            llm_output={"token_usage": token_usage_sum} if any(token_usage_sum.values()) else None
+        )
 
     def _stream(
         self,
@@ -181,10 +231,6 @@ class SarvamLLM(BaseLLM):
             _call method in a separate thread, preventing blocking
             of the event loop.
         """
-        return await asyncio.to_thread(
-            self._call,
-            input,
-            stop,
-            None,  # run_manager
-            **kwargs,
-        )
+        # Use the parent class's ainvoke which handles callbacks properly
+        # The parent will call our _call method with the correct run_manager
+        return await super().ainvoke(input, config, stop=stop, **kwargs)

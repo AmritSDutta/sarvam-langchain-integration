@@ -67,7 +67,9 @@ src/sarvam/
 ### Core Classes
 
 Both `SarvamChat` and `SarvamLLM` wrap the `sarvamai.SarvamAI` client's `chat.completions()` API. They support:
-- Async operations via `ainvoke()` (using `asyncio.to_thread()` since Sarvam SDK is synchronous)
+- Flexible input handling via `_convert_messages()` (strings, BaseMessages, or mixed lists)
+- LangSmith tracing with automatic token usage tracking and metadata
+- Async operations via `super().ainvoke()` (parent handles thread pool)
 - Parameters: `temperature`, `top_p`, `reasoning_effort`, `wiki_grounding`
 - API key via constructor parameter or `SARVAM_API_KEY` environment variable (stored with `pydantic.SecretStr`)
 - Logging via `sarvam_logging.py` (DEBUG level for API calls and token usage)
@@ -134,7 +136,9 @@ Both classes use these defaults:
 
 ### Async Implementation
 
-Since the Sarvam AI SDK doesn't support async natively, `ainvoke()` uses `asyncio.to_thread()` to run synchronous `_generate()`/`_call()` in a thread pool. This prevents blocking the event loop while maintaining full async compatibility with LangChain's async chain APIs.
+Since the Sarvam AI SDK doesn't support async natively, both classes use `super().ainvoke()` which internally handles callback dispatch. For `BaseChatModel` and `BaseLLM`, the parent class manages the thread pool execution and callback propagation automatically.
+
+**Important**: Always use `super().ainvoke()` rather than manually calling `asyncio.to_thread()` to ensure proper LangChain callback handling.
 
 ### Structured Output Utilities
 
@@ -154,7 +158,78 @@ Sarvam AI often includes reasoning text before JSON output (especially with `rea
 - `test/sarvam/test_utils.py` - Tests for utility functions
 - `test/sarvam/test_async.py` - Tests for async functionality
 - `test/sarvam/test_integration.py` - Integration tests (marked with `@pytest.mark.integration`, requires `SARVAM_API_KEY`)
+- `test/sarvam/test_langsmith.py` - LangSmith tracing tests (requires `SARVAM_API_KEY`)
 
 ## API Key Requirements
 
 Unit tests mock the API and don't require a real key. Integration tests require `SARVAM_API_KEY` environment variable to be set for real Sarvam AI API calls.
+
+## LangSmith Tracing Integration
+
+Both `SarvamChat` and `SarvamLLM` support LangSmith tracing out of the box:
+
+### How It Works
+- **Automatic metadata**: Sets `ls_provider="sarvam"` and `ls_model_name` for proper categorization
+- **Token tracking**:
+  - `SarvamChat` returns `AIMessage` with `usage_metadata` containing `input_tokens`, `output_tokens`, `total_tokens`
+  - `SarvamLLM` passes token usage via `LLMResult.llm_output["token_usage"]`
+- **Error callbacks**: `run_manager.on_llm_error()` notifies LangSmith of API failures
+- **Completion callbacks**: `run_manager.on_llm_end()` posts results to LangSmith
+
+### Usage
+Just enable LangSmith environment variables and invoke normally:
+
+```python
+import os
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "your-langsmith-key"
+os.environ["LANGCHAIN_PROJECT"] = "your-project"
+
+from sarvam import SarvamChat
+
+chat = SarvamChat()
+response = chat.invoke("Hello!")
+# Trace automatically posted to LangSmith with token counts
+```
+
+### Testing LangSmith Integration
+Run the LangSmith tests to verify:
+```bash
+pytest test/sarvam/test_langsmith.py -v -s
+```
+
+## Version Bumping Process
+
+To release a new version:
+
+1. **Update version numbers**:
+   - `pyproject.toml`: `version = "0.1.x"`
+   - `src/sarvam/__init__.py`: `__version__ = "0.1.x"`
+
+2. **Update CHANGELOG.md**:
+   - Add new section under `[Unreleased]` or create new version entry
+   - Document fixes, features, breaking changes
+   - Update version comparison links at bottom
+
+3. **Build package**:
+   ```bash
+   python -m build
+   ```
+
+4. **Publish to PyPI**:
+   ```bash
+   twine upload dist/langchain_sarvam_integration-0.1.x.*
+   ```
+
+**Note**: PyPI does not allow overwriting existing versions. Always increment the version number.
+
+## Input Handling
+
+Both `SarvamChat` and `SarvamLLM` support flexible input:
+
+- **String input**: `chat.invoke("Hello")` → automatically wrapped as user message
+- **List of strings**: `chat.invoke(["Hello", "How are you?"])` → each wrapped as user message
+- **Mixed messages**: `chat.invoke([HumanMessage("Hi"), "Hello"])` → mixed types supported
+- **BaseMessage list**: Standard LangChain message format
+
+This makes the integration more user-friendly and compatible with code that passes plain strings.
