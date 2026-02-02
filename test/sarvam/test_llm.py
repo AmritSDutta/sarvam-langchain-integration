@@ -7,7 +7,7 @@ from sarvam import SarvamLLM
 
 def test_llm_invoke():
     """Test LLM style invocation."""
-    with patch("sarvam.llm.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.llm.SarvamAI") as mock_sarvam:
         # Mock the API response structure
         mock_message = Mock()
         mock_message.content = "New Delhi"
@@ -33,7 +33,7 @@ def test_llm_invoke():
 
 def test_llm_with_temperature():
     """Test LLM with custom temperature."""
-    with patch("sarvam.llm.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.llm.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
@@ -54,7 +54,7 @@ def test_llm_with_temperature():
 
 def test_llm_with_reasoning_effort():
     """Test LLM with reasoning effort enabled."""
-    with patch("sarvam.llm.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.llm.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Reasoned response"
         mock_choice = Mock()
@@ -75,7 +75,7 @@ def test_llm_with_reasoning_effort():
 
 def test_llm_with_wiki_grounding():
     """Test LLM with wiki grounding enabled."""
-    with patch("sarvam.llm.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.llm.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Factual answer"
         mock_choice = Mock()

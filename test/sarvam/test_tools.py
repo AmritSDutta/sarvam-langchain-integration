@@ -13,7 +13,7 @@ def test_bind_tools_with_tool_decorator():
     Note: Sarvam AI does not support tool calling yet. This test verifies
     that tools can be bound and logged appropriately.
     """
-    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
         # Mock the API response (Sarvam doesn't return tool calls)
         mock_message = Mock()
         mock_message.content = "I cannot check the weather, but I can tell you about Delhi."
@@ -43,7 +43,7 @@ def test_bind_tools_with_tool_decorator():
         assert bound_chat.bound_tools[0]["name"] == "get_weather"
 
         # Invoke with bound tools (should log but work)
-        with patch("sarvam.chat.logger") as mock_logger:
+        with patch("sarvam.chat.model.logger") as mock_logger:
             response = bound_chat.invoke([HumanMessage(content="What's the weather in Mumbai?")])
 
             # Should have logged about tools not being supported
@@ -63,7 +63,7 @@ def test_bind_tools_with_tool_decorator():
 
 def test_bind_tools_with_dict():
     """Test binding tools using dictionary format."""
-    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
@@ -102,7 +102,7 @@ def test_bind_tools_with_dict():
 
 def test_bind_tools_multiple():
     """Test binding multiple tools."""
-    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
@@ -137,7 +137,7 @@ def test_bind_tools_multiple():
 
 def test_bind_tools_preserves_parameters():
     """Test that bind_tools preserves original model parameters."""
-    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()
@@ -172,7 +172,7 @@ def test_bind_tools_preserves_parameters():
 
 def test_bind_tools_with_additional_kwargs():
     """Test bind_tools with additional kwargs."""
-    with patch("sarvam.chat.SarvamAI") as mock_sarvam:
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
         mock_message = Mock()
         mock_message.content = "Response"
         mock_choice = Mock()

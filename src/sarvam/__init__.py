@@ -1,6 +1,5 @@
 """Sarvam AI integration with LangChain."""
-from sarvam.chat import SarvamChat
-from sarvam.llm import SarvamLLM
+from sarvam.chat import SarvamChat, SarvamLLM
 
 __all__ = ["SarvamChat", "SarvamLLM"]
 
