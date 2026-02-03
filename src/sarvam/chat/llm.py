@@ -8,6 +8,7 @@ from langchain_core.language_models.llms import BaseLLM
 from langchain_core.outputs import Generation, GenerationChunk, LLMResult
 from langchain_core.runnables import RunnableConfig
 from pydantic import Field, SecretStr
+from sarvamai.core import RequestOptions
 from typing_extensions import override
 
 from sarvamai import SarvamAI
@@ -38,6 +39,7 @@ class SarvamLLM(BaseLLM):
         description="Reasoning effort: low, medium, or high",
     )
     wiki_grounding: bool = Field(default=True, description="Enable wiki grounding")
+    max_retry: int = 3
 
     _client: Optional[SarvamAI] = None
 
@@ -92,6 +94,10 @@ class SarvamLLM(BaseLLM):
             params["reasoning_effort"] = self.reasoning_effort
         if self.wiki_grounding:
             params["wiki_grounding"] = True
+        if self.max_retry:
+            params["request_options"] = RequestOptions(
+                max_retries=self.max_retry,
+            )
 
         # Override with any additional kwargs
         params.update(kwargs)
@@ -102,7 +108,8 @@ class SarvamLLM(BaseLLM):
             f"prompt_length={len(prompt)}, "
             f"temperature={self.temperature}, "
             f"reasoning_effort={self.reasoning_effort}, "
-            f"wiki_grounding={self.wiki_grounding}"
+            f"wiki_grounding={self.wiki_grounding}, "
+            f"max_retries={self.max_retry}"
         )
 
         try:
@@ -140,7 +147,11 @@ class SarvamLLM(BaseLLM):
         # Store token_usage as an instance variable for _generate to access
         self._last_token_usage = token_usage
 
-        return response.choices[0].message.content
+        # Extract content after `` tag if present
+        raw_content = response.choices[0].message.content
+        content = self._extract_after_think(raw_content)
+
+        return content
 
     def _generate(
         self,
@@ -234,3 +245,15 @@ class SarvamLLM(BaseLLM):
         # Use the parent class's ainvoke which handles callbacks properly
         # The parent will call our _call method with the correct run_manager
         return await super().ainvoke(input, config, stop=stop, **kwargs)
+
+    def _extract_after_think(self, text: str) -> str:
+        """Extract content after `` tag.
+
+        Sarvam AI sometimes includes reasoning blocks in `` tags.
+        This method extracts the actual response content after the tag.
+        """
+        tag = "</think>"
+        idx = text.find(tag)
+        if idx == -1:
+            return text
+        return text[idx + len(tag):].strip() if idx != -1 else ""

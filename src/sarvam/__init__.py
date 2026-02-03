@@ -15,4 +15,4 @@ __all__ = [
     "parse_structured_output",
 ]
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"

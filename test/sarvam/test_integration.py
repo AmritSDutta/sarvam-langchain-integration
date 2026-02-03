@@ -279,3 +279,55 @@ Example outputs: -coding, reasoning, cheap -informational, cheap, long -summariz
         default_capabilities = {"reasoning", "informational", "planning"}
         print(f"Warning: Capability inference failed[{planning_model}]: {e}, will return {default_capabilities}")
         raise
+
+
+@pytest.mark.integration
+def test_think_tag_extraction_with_real_api():
+    """Test `` tag extraction with real API call.
+
+    This test verifies that SarvamChat properly extracts content after
+    the `` tag when the model includes reasoning blocks in responses.
+
+    Run with:
+        pytest -m integration test/sarvam/test_integration.py::test_think_tag_extraction_with_real_api
+    """
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Use high reasoning effort to trigger `` tag in response
+    chat = SarvamChat(
+        api_key=api_key,
+        reasoning_effort="high",
+        temperature=0.3,
+        max_retry=3
+    )
+
+    print("\n[Test] `` tag extraction with real API")
+    print("-" * 60)
+
+    # Ask a question that likely triggers reasoning
+    prompt = "What is the capital of India? Answer with just the city name."
+
+    response = chat.invoke([HumanMessage(content=prompt)])
+
+    print(f"  Response content: {response.content[:100]}...")
+
+    # Verify we got a response
+    assert response.content is not None
+    assert isinstance(response.content, str)
+    assert len(response.content) > 0
+
+    # The response should be the extracted content after `` tag
+    # It should NOT contain the `` tag itself
+    assert "<think>" not in response.content, "Response should not contain <think> tag"
+    assert "</think>" not in response.content, "Response should not contain </think> tag"
+
+    # The extracted content should be the actual answer (e.g., "New Delhi" or "Delhi")
+    # Check for expected keywords
+    assert any(word in response.content.lower() for word in ["delhi", "new delhi"]), \
+        f"Expected city name in response, got: {response.content}"
+
+    print(f"  Final extracted answer: {response.content}")
+    print("  [PASS] `` tag extraction test PASSED")
+    print("-" * 60)

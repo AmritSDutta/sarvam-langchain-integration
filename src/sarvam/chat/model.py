@@ -12,6 +12,7 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_function
 from pydantic import Field, SecretStr
+from sarvamai.core import RequestOptions
 from typing_extensions import override
 
 from sarvamai import SarvamAI
@@ -48,6 +49,7 @@ class SarvamChat(BaseChatModel):
     bound_tools: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Tools bound to this model instance"
     )
+    max_retry: int = 3
 
     _client: Optional[SarvamAI] = None
 
@@ -124,6 +126,10 @@ class SarvamChat(BaseChatModel):
             params["reasoning_effort"] = self.reasoning_effort
         if self.wiki_grounding:
             params["wiki_grounding"] = True
+        if self.max_retry:
+            params["request_options"] = RequestOptions(
+                max_retries=self.max_retry,
+            )
 
         # Note: Sarvam API does not support tools/function calling yet
         # Tools are stored in bound_tools but not passed to API
@@ -146,7 +152,8 @@ class SarvamChat(BaseChatModel):
             f"messages={len(params['messages'])}, "
             f"temperature={self.temperature}, "
             f"reasoning_effort={self.reasoning_effort}, "
-            f"wiki_grounding={self.wiki_grounding}"
+            f"wiki_grounding={self.wiki_grounding}, "
+            f"max_retries={self.max_retry}"
         )
 
         try:
@@ -160,7 +167,8 @@ class SarvamChat(BaseChatModel):
 
         # Extract response
         message = response.choices[0].message
-        content = message.content
+        raw_content = message.content
+        content = self._extract_after_think(raw_content)
 
         # Build token usage info if available (for LangSmith and response metadata)
         token_usage = None
@@ -279,3 +287,10 @@ class SarvamChat(BaseChatModel):
         # Use the parent class's ainvoke which handles callbacks properly
         # The parent will call our _generate method with the correct run_manager
         return await super().ainvoke(input, config, stop=stop, **kwargs)
+
+    def _extract_after_think(self, text: str) -> str:
+        tag = "</think>"
+        idx = text.find(tag)
+        if idx == -1:
+            return text
+        return text[idx + len(tag):].strip() if idx != -1 else ""

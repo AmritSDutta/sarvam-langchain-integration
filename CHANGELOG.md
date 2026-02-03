@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-02-03
+
+### Added
+- **`` tag extraction**: Both `SarvamChat` and `SarvamLLM` now automatically extract content after </think> reasoning blocks
+- **`max_retry` parameter**: Configurable retry behavior via `RequestOptions(max_retries=N)` for both models
+
+### Changed
+- Responses containing <think>...</think> tags now return only the content after the tag (clean output)
+
+### Technical Details
+- Added `_extract_after_think()` method to both `SarvamChat` and `SarvamLLM`
+- API calls now include `request_options` with `max_retries` when specified
+
 ## [0.1.2] - 2026-02-02
 
 ### Added
