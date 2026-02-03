@@ -133,6 +133,21 @@ Both classes use these defaults:
 - `top_p`: 1.0
 - `reasoning_effort`: "high"
 - `wiki_grounding`: True
+- `max_retry`: 3
+
+### `` Tag Extraction
+
+Both `SarvamChat` and `SarvamLLM` automatically extract content after `` reasoning blocks. Sarvam AI may include reasoning text before the actual response, especially with `reasoning_effort="high"`. The `_extract_after_think()` method removes these tags and returns only the actual response content.
+
+### Request Retry Behavior
+
+Both classes support configurable retries via the `max_retry` parameter:
+```python
+chat = SarvamChat(max_retry=5)  # Up to 5 retries on failure
+llm = SarvamLLM(max_retry=0)    # Disable retries
+```
+
+The `RequestOptions(max_retries=N)` is passed to the Sarvam AI SDK for automatic retry handling.
 
 ### Async Implementation
 
@@ -166,7 +181,35 @@ Unit tests mock the API and don't require a real key. Integration tests require 
 
 ## LangSmith Tracing Integration
 
-Both `SarvamChat` and `SarvamLLM` support LangSmith tracing out of the box:
+Both `SarvamChat` and `SarvamLLM` support LangSmith tracing out of the box.
+
+### **CRITICAL: Callback Handling Warning**
+
+**DO NOT manually call `run_manager.on_llm_end()` in `_generate()` or `_generate()` methods.** The parent class (`BaseChatModel`/`BaseLLM`) automatically handles this when you return the result. Manual calls cause duplicate callback invocations leading to errors:
+
+- `KeyError(0)` in LangChainTracer
+- `TypeError("'ChatGeneration' object is not subscriptable")` in StreamMessagesHandler
+- `TracerException('No indexed run ID')` in LangSmith
+
+**Correct pattern:**
+```python
+# In _generate() - just return the result
+def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+    # ... API call and response processing ...
+    generation = ChatGeneration(message=AIMessage(content=content))
+    return ChatResult(generations=[generation], llm_output={"token_usage": token_usage})
+    # Parent class will call on_llm_end() automatically
+```
+
+**You MAY call `run_manager.on_llm_error()` before raising exceptions:**
+```python
+try:
+    response = self._client.chat.completions(**params)
+except ApiError as e:
+    if run_manager:
+        run_manager.on_llm_error(e)
+    raise
+```
 
 ### How It Works
 - **Automatic metadata**: Sets `ls_provider="sarvam"` and `ls_model_name` for proper categorization
@@ -174,7 +217,7 @@ Both `SarvamChat` and `SarvamLLM` support LangSmith tracing out of the box:
   - `SarvamChat` returns `AIMessage` with `usage_metadata` containing `input_tokens`, `output_tokens`, `total_tokens`
   - `SarvamLLM` passes token usage via `LLMResult.llm_output["token_usage"]`
 - **Error callbacks**: `run_manager.on_llm_error()` notifies LangSmith of API failures
-- **Completion callbacks**: `run_manager.on_llm_end()` posts results to LangSmith
+- **Completion callbacks**: Parent class automatically calls `on_llm_end()` when result is returned
 
 ### Usage
 Just enable LangSmith environment variables and invoke normally:

@@ -15,6 +15,7 @@ from sarvamai import SarvamAI
 from sarvamai.core.api_error import ApiError
 
 from sarvam.sarvam_logging import logger
+from sarvam.chat.utils import extract_after_think
 
 
 class SarvamLLM(BaseLLM):
@@ -149,7 +150,7 @@ class SarvamLLM(BaseLLM):
 
         # Extract content after `` tag if present
         raw_content = response.choices[0].message.content
-        content = self._extract_after_think(raw_content)
+        content = extract_after_think(raw_content)
 
         return content
 
@@ -173,15 +174,6 @@ class SarvamLLM(BaseLLM):
                 token_usage_sum["input_tokens"] += self._last_token_usage["input_tokens"]
                 token_usage_sum["output_tokens"] += self._last_token_usage["output_tokens"]
                 token_usage_sum["total_tokens"] += self._last_token_usage["total_tokens"]
-
-        # Notify LangSmith of completion with token usage
-        if run_manager:
-            llm_result = LLMResult(
-                generations=generations,
-                llm_output={"token_usage": token_usage_sum} if any(token_usage_sum.values()) else None
-            )
-            run_manager.on_llm_end(llm_result)
-            return llm_result
 
         return LLMResult(
             generations=generations,
@@ -245,15 +237,3 @@ class SarvamLLM(BaseLLM):
         # Use the parent class's ainvoke which handles callbacks properly
         # The parent will call our _call method with the correct run_manager
         return await super().ainvoke(input, config, stop=stop, **kwargs)
-
-    def _extract_after_think(self, text: str) -> str:
-        """Extract content after `` tag.
-
-        Sarvam AI sometimes includes reasoning blocks in `` tags.
-        This method extracts the actual response content after the tag.
-        """
-        tag = "</think>"
-        idx = text.find(tag)
-        if idx == -1:
-            return text
-        return text[idx + len(tag):].strip() if idx != -1 else ""

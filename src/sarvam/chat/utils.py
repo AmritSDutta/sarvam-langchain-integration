@@ -157,3 +157,16 @@ def parse_structured_output(content: str, model: Type[T]) -> T:
     """
     json_str = extract_json(content)
     return model.model_validate_json(json_str)
+
+
+def extract_after_think(text: str) -> str:
+    """Extract content after `` tag.
+
+    Sarvam AI sometimes includes reasoning blocks in `` tags.
+    This method extracts the actual response content after the tag.
+    """
+    tag = "</think>"
+    idx = text.find(tag)
+    if idx == -1:
+        return text
+    return text[idx + len(tag):].strip() if idx != -1 else ""

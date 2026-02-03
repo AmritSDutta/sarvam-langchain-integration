@@ -5,6 +5,7 @@ from sarvam.chat import (
     extract_json,
     parse_json_response,
     parse_structured_output,
+    extract_after_think,
 )
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "extract_json",
     "parse_json_response",
     "parse_structured_output",
+    "extract_after_think",
 ]
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"

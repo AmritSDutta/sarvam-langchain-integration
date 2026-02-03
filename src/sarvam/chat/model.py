@@ -19,6 +19,7 @@ from sarvamai import SarvamAI
 from sarvamai.core.api_error import ApiError
 
 from sarvam.sarvam_logging import logger
+from sarvam.chat.utils import extract_after_think
 
 # Constants for feature limitations
 _FEATURE_TOOLS_NOT_SUPPORTED = "tools_not_supported"
@@ -168,7 +169,7 @@ class SarvamChat(BaseChatModel):
         # Extract response
         message = response.choices[0].message
         raw_content = message.content
-        content = self._extract_after_think(raw_content)
+        content = extract_after_think(raw_content)
 
         # Build token usage info if available (for LangSmith and response metadata)
         token_usage = None
@@ -204,10 +205,6 @@ class SarvamChat(BaseChatModel):
                 **({"usage_metadata": usage_metadata} if usage_metadata else {})
             )
         )
-
-        # Notify LangSmith of completion
-        if run_manager:
-            run_manager.on_llm_end(ChatResult(generations=[generation], llm_output={"token_usage": token_usage}))
 
         return ChatResult(generations=[generation], llm_output={"token_usage": token_usage})
 
@@ -287,10 +284,3 @@ class SarvamChat(BaseChatModel):
         # Use the parent class's ainvoke which handles callbacks properly
         # The parent will call our _generate method with the correct run_manager
         return await super().ainvoke(input, config, stop=stop, **kwargs)
-
-    def _extract_after_think(self, text: str) -> str:
-        tag = "</think>"
-        idx = text.find(tag)
-        if idx == -1:
-            return text
-        return text[idx + len(tag):].strip() if idx != -1 else ""

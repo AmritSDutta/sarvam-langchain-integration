@@ -18,6 +18,28 @@ The integration supports several advanced features, including:
 *   **Async Operations**: Asynchronous support for non-blocking calls.
 *   **Tool Binding**: Bind tools to the chat model for future compatibility.
 
+## Code Structure and Design
+
+The core logic of the library is organized into the `src/sarvam/chat` directory, containing:
+
+*   `model.py`: Implements the `SarvamChat` class for multi-turn conversations.
+*   `llm.py`: Implements the `SarvamLLM` class for single-turn prompt-response interactions.
+*   `utils.py`: Provides utility functions for parsing JSON and extracting content after specific tags from model outputs.
+*   `__init__.py`: Exposes the chat-related classes and functions.
+
+The `src/sarvam/__init__.py` file serves to expose the main classes and functions to the user.
+
+**Key Design Principles:**
+
+*   **Modularity:** The codebase is well-organized into distinct modules, enhancing maintainability and extensibility.
+*   **Clarity and Readability:** Consistent use of type hints and comprehensive docstrings ensures the code is easy to understand.
+*   **Error Handling:** Robust error handling is implemented for API interactions, improving application stability.
+*   **Configuration:** Secure API key handling via environment variables or direct parameter passing is supported.
+*   **Asynchronous Support:** `ainvoke` methods provide asynchronous capabilities by efficiently running synchronous operations in a thread pool, addressing the current lack of native async support in the Sarvam AI SDK.
+*   **Future Compatibility:** The `bind_tools` method is included to facilitate future integration with Sarvam AI's tool-calling features when they become available.
+*   **Robust JSON Parsing:** The `extract_json` and `parse_structured_output` functions in `utils.py` are designed to reliably handle various JSON response formats, including those with reasoning blocks and markdown.
+*   **Centralized Logging:** The project uses a dedicated logger (`sarvam.sarvam_logging`) for effective debugging and monitoring, following best practices for library logging.
+
 ## Building and Running
 
 ### Installation
@@ -214,3 +236,4 @@ pytest -m "not integration"
 *   **Linting and Type Checking**: The project uses `ruff` for linting and `mypy` for type checking. These are likely run as part of the CI pipeline.
 *   **Branching and Pull Requests**: The `CONTRIBUTING.md` file and the pull request template suggest a standard branching and pull request workflow.
 *   **Testing**: The project has a comprehensive test suite that covers both the core functionality and the advanced features. New features should be accompanied by corresponding tests.
+*   **No `src/__init__.py`:** The `src/__init__.py` file has been removed as it is not necessary for modern Python packaging.

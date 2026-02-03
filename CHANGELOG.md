@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-02-03
+
+### Fixed
+- **Critical**: Removed duplicate `run_manager.on_llm_end()` calls that were causing callback errors:
+  - `KeyError(0)` in LangChainTracer
+  - `TypeError("'ChatGeneration' object is not subscriptable")` in StreamMessagesHandler
+  - `TracerException('No indexed run ID')` in LangSmith
+- Callbacks are now properly handled by the parent class only (no manual `on_llm_end()` calls)
+
 ## [0.1.3] - 2026-02-03
 
 ### Added
