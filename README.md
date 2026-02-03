@@ -3,7 +3,7 @@
 [![PyPI Version](https://img.shields.io/pypi/v/langchain-sarvam-integration)](https://pypi.org/project/langchain-sarvam-integration/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/langchain-sarvam-integration)](https://pypi.org/project/langchain-sarvam-integration/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Tests](https://github.com/your-username/langchain-sarvam-integration/workflows/Tests/badge.svg)](https://github.com/your-username/langchain-sarvam-integration/actions)
+[![Tests](https://github.com/AmritSDutta/sarvam_lanchchain_integration/workflows/Tests/badge.svg)](https://github.com/AmritSDutta/sarvam_lanchchain_integration/actions)
 
 LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM with native support for Hindi and other Indic languages.
 
@@ -33,7 +33,7 @@ pip install langchain-sarvam-integration
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/sarvam_lanchchain_integration.git
+git clone https://github.com/AmritSDutta/sarvam_lanchchain_integration.git
 cd sarvam_lanchchain_integration
 pip install -e .
 ```
@@ -423,6 +423,7 @@ Example output:
 | `top_p` | `float` | `1.0` | Nucleus sampling (0-1) |
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
 | `wiki_grounding` | `bool` | `True` | Enable wiki grounding for factual queries |
+| `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
 
 ## Limitations
 
@@ -468,9 +469,9 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## Community
 
-- 🐛 **Bug Reports**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=bug_report.md)
-- 💡 **Feature Requests**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=feature_request.md)
-- ❓ **Questions**: [Open an issue](https://github.com/your-username/langchain-sarvam-integration/issues/new?template=question.md)
+- 🐛 **Bug Reports**: [Open an issue](https://github.com/AmritSDutta/sarvam_lanchchain_integration/issues/new?template=bug_report.md)
+- 💡 **Feature Requests**: [Open an issue](https://github.com/AmritSDutta/sarvam_lanchchain_integration/issues/new?template=feature_request.md)
+- ❓ **Questions**: [Open an issue](https://github.com/AmritSDutta/sarvam_lanchchain_integration/issues/new?template=question.md)
 - 📖 **Code of Conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - 🔒 **Security Policy**: [SECURITY.md](SECURITY.md)
 

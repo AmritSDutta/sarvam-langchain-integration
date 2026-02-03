@@ -70,7 +70,7 @@ Both `SarvamChat` and `SarvamLLM` wrap the `sarvamai.SarvamAI` client's `chat.co
 - Flexible input handling via `_convert_messages()` (strings, BaseMessages, or mixed lists)
 - LangSmith tracing with automatic token usage tracking and metadata
 - Async operations via `super().ainvoke()` (parent handles thread pool)
-- Parameters: `temperature`, `top_p`, `reasoning_effort`, `wiki_grounding`
+- Parameters: `temperature`, `top_p`, `reasoning_effort`, `wiki_grounding`, `max_tokens`
 - API key via constructor parameter or `SARVAM_API_KEY` environment variable (stored with `pydantic.SecretStr`)
 - Logging via `sarvam_logging.py` (DEBUG level for API calls and token usage)
 

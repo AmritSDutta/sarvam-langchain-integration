@@ -23,6 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/AmritSDutta/sarvam_lanchchain_integration"
+Repository = "https://github.com/AmritSDutta/sarvam_lanchchain_integration"
+
 dependencies = [
     "langchain>=0.1.0",
     "langchain-core>=0.1.0",
