@@ -51,6 +51,7 @@ class SarvamChat(BaseChatModel):
         default=None, description="Tools bound to this model instance"
     )
     max_retry: int = 3
+    max_tokens: int = Field(default=8192, ge=1, description="Maximum tokens to generate")
 
     _client: Optional[SarvamAI] = None
 
@@ -131,6 +132,7 @@ class SarvamChat(BaseChatModel):
             params["request_options"] = RequestOptions(
                 max_retries=self.max_retry,
             )
+        params["max_tokens"] = self.max_tokens
 
         # Note: Sarvam API does not support tools/function calling yet
         # Tools are stored in bound_tools but not passed to API
@@ -154,6 +156,7 @@ class SarvamChat(BaseChatModel):
             f"temperature={self.temperature}, "
             f"reasoning_effort={self.reasoning_effort}, "
             f"wiki_grounding={self.wiki_grounding}, "
+            f"max_tokens={self.max_tokens}, "
             f"max_retries={self.max_retry}"
         )
 
@@ -225,6 +228,7 @@ class SarvamChat(BaseChatModel):
             "top_p": self.top_p,
             "reasoning_effort": self.reasoning_effort,
             "wiki_grounding": self.wiki_grounding,
+            "max_tokens": self.max_tokens,
         }
 
     def bind_tools(

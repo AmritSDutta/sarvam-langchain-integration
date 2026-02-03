@@ -133,6 +133,7 @@ Both classes use these defaults:
 - `top_p`: 1.0
 - `reasoning_effort`: "high"
 - `wiki_grounding`: True
+- `max_tokens`: 8192
 - `max_retry`: 3
 
 ### `` Tag Extraction
