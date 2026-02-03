@@ -83,7 +83,7 @@ Both `SarvamChat` and `SarvamLLM` wrap the `sarvamai.SarvamAI` client's `chat.co
 from sarvam import SarvamLLM, SarvamChat
 
 # Also available
-from sarvam import extract_json, parse_json_response, parse_structured_output
+from sarvam import extract_json, parse_json_response, parse_structured_output, extract_after_think
 
 # Wrong - will fail
 from src.sarvam import SarvamLLM

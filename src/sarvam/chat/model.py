@@ -157,14 +157,22 @@ class SarvamChat(BaseChatModel):
             f"max_retries={self.max_retry}"
         )
 
-        try:
-            response = self._client.chat.completions(**params)
-        except ApiError as e:
-            # Notify LangSmith of error
-            if run_manager:
-                run_manager.on_llm_error(e)
-            logger.error(f"Sarvam API error: {e.body}")
-            raise RuntimeError(f"Sarvam API error: {e.body}") from e
+        # Application-level retry: Retry API call up to max_retry times on ApiError
+        # Note: SDK also has internal retry via RequestOptions, providing additional resilience
+        response = None
+        for attempt in range(self.max_retry):
+            try:
+                response = self._client.chat.completions(**params)
+                break  # Success - exit retry loop
+            except ApiError as e:
+                if attempt < self.max_retry - 1:
+                    logger.warning(f"API error on attempt {attempt + 1}/{self.max_retry}: {e.body}. Retrying...")
+                    continue  # Try again
+                # Final attempt failed - notify LangSmith and raise
+                if run_manager:
+                    run_manager.on_llm_error(e)
+                logger.error(f"Sarvam API error after {self.max_retry} attempts: {e.body}")
+                raise RuntimeError(f"Sarvam API error: {e.body}") from e
 
         # Extract response
         message = response.choices[0].message
