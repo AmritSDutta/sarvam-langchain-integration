@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Streaming support** for `SarvamChat` and `SarvamLLM` via `stream()` and `astream()` methods (single-chunk fallback until Sarvam AI adds native streaming)
+- New `_stream()` method in `SarvamChat` for LangChain streaming interface compatibility
+- Updated `_stream()` method in `SarvamLLM` with improved documentation
+
 ### Fixed
 - JSON parsing failures when Sarvam API responses are truncated (set max_tokens=8192 as default)
 

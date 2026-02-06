@@ -40,10 +40,10 @@ src/
 ## Dependencies & Configuration
 
 - **Python**: >=3.9
-- **Core Dependencies**: 
+- **Core Dependencies**:
   - `langchain>=0.1.0`
   - `langchain-core>=0.1.0`
-  - `sarvamai==0.1.22`
+  - `sarvamai==0.1.24`
 - **Dev Dependencies**: pytest, ruff, mypy
 
 Configuration is done via:

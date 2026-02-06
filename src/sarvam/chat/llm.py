@@ -200,13 +200,26 @@ class SarvamLLM(BaseLLM):
     ) -> Iterator[GenerationChunk]:
         """Stream the Sarvam API response.
 
-        Note: Sarvam API may not support streaming yet. This is a placeholder
-        for future implementation when streaming becomes available.
+        Note: Sarvam AI API does not support streaming yet. This implementation
+        falls back to non-streaming and yields the complete response as a single chunk.
+        When Sarvam AI adds streaming support, this can be updated to use native streaming.
+
+        Args:
+            prompt: The input prompt to send to the model
+            stop: Optional list of stop strings
+            run_manager: Optional callback manager for run tracking
+            **kwargs: Additional arguments to pass to the model
+
+        Yields:
+            GenerationChunk: A single chunk containing the complete response
         """
-        # TODO: Implement streaming when Sarvam API supports it
-        # For now, fall back to non-streaming
         text = self._call(prompt, stop, run_manager, **kwargs)
-        yield GenerationChunk(text=text)
+        chunk = GenerationChunk(text=text)
+
+        if run_manager:
+            run_manager.on_llm_new_token(text, chunk=chunk)
+
+        yield chunk
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:

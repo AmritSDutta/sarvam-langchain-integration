@@ -156,6 +156,36 @@ Since the Sarvam AI SDK doesn't support async natively, both classes use `super(
 
 **Important**: Always use `super().ainvoke()` rather than manually calling `asyncio.to_thread()` to ensure proper LangChain callback handling.
 
+### Streaming Support
+
+Both `SarvamChat` and `SarvamLLM` support streaming via `stream()` and `astream()` methods.
+
+**Note**: Sarvam AI API does not currently support native streaming. The streaming interface is implemented using single-chunk fallback - the complete response is yielded as one chunk. When Sarvam AI adds native streaming support, the implementation can be updated accordingly.
+
+```python
+# Example: SarvamChat streaming
+from sarvam import SarvamChat
+
+chat = SarvamChat()
+for chunk in chat.stream("Hello, how are you?"):
+    print(chunk.content, end="")
+print()
+
+# Example: SarvamLLM streaming
+from sarvam import SarvamLLM
+
+llm = SarvamLLM()
+for chunk in llm.stream("Tell me a joke"):
+    print(chunk.text, end="")
+print()
+```
+
+Both classes implement `_stream()` to:
+1. Call the Sarvam AI API with the full request parameters
+2. Extract and process the complete response
+3. Yield a single `ChatGenerationChunk` (for SarvamChat) or `GenerationChunk` (for SarvamLLM) containing the complete response
+4. Support LangSmith tracing via token usage metadata
+
 ### Structured Output Utilities
 
 The `utils.py` module provides functions to extract JSON from Sarvam AI responses:

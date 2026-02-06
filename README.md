@@ -18,6 +18,7 @@ This project demonstrates modern AI-assisted software development practices, wit
 - 🤖 **SarvamLLM** - Simple prompt-response interface
 - 💬 **SarvamChat** - Multi-turn conversation support
 - ⚡ **Async Support** - Non-blocking async operations
+- 🌊 **Streaming Support** - Real-time response streaming
 - 🧠 **Reasoning Mode** - Built-in thinking capability
 - 📚 **Wiki Grounding** - Factual query enhancement
 - 🇮🇳 **Hindi & Indic Languages** - Native language support
@@ -117,6 +118,61 @@ asyncio.run(main())
 ```
 
 **Note:** Since the Sarvam AI SDK doesn't support async operations natively, `ainvoke()` uses `asyncio.to_thread()` to run synchronous API calls in a thread pool, preventing event loop blocking while still being fully async-compatible.
+
+### Streaming Support
+
+Both `SarvamChat` and `SarvamLLM` support streaming via `stream()` and `astream()` methods for real-time response processing:
+
+```python
+from sarvam import SarvamChat, SarvamLLM
+
+# SarvamChat streaming
+chat = SarvamChat()
+for chunk in chat.stream("Hello, how are you?"):
+    print(chunk.content, end="")
+print()
+
+# SarvamLLM streaming
+llm = SarvamLLM()
+for chunk in llm.stream("Tell me a joke"):
+    print(chunk.text, end="")
+print()
+
+# Async streaming
+import asyncio
+
+async def main():
+    chat = SarvamChat()
+    async for chunk in chat.astream("What's the weather like?"):
+        print(chunk.content, end="")
+
+asyncio.run(main())
+```
+
+**Note:** Sarvam AI API does not currently support native streaming. The streaming interface is implemented using single-chunk fallback - the complete response is yielded as one chunk. This provides LangChain compatibility while waiting for Sarvam AI to add native streaming support.
+
+#### What is Native Streaming?
+
+**Native streaming** (also called true streaming) is when the AI API sends the response piece-by-piece as it's being generated. Instead of waiting for the entire response to complete, you receive tokens in real-time:
+
+```python
+# Example of native streaming (not currently supported by Sarvam AI)
+for chunk in chat.stream("Tell me a story"):
+    print(chunk.content, end="", flush=True)  # Prints word-by-word as generated
+    # Output appears gradually: "Once" → "Once upon" → "Once upon a" → "Once upon a time"...
+```
+
+**Benefits of native streaming:**
+- **Faster perceived response time**: Users see text appearing immediately
+- **Better UX for long responses**: No waiting for complete generation
+- **Real-time processing**: Can start processing/analyzing partial responses
+- **Lower memory usage**: No need to buffer the entire response
+
+**Current implementation (single-chunk fallback):**
+- The complete response is generated internally by Sarvam AI
+- Once generation is complete, the entire response is yielded as one chunk
+- Provides LangChain interface compatibility
+- Will automatically upgrade to native streaming when Sarvam AI adds support
 
 ### Advanced Features
 
@@ -426,6 +482,8 @@ Example output:
 | `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
 
 ## Limitations
+
+**Streaming**: The `stream()` and `astream()` methods are implemented with single-chunk fallback since **Sarvam AI API does not currently support native streaming**. The complete response is yielded as one chunk for LangChain compatibility. Native streaming will be supported when the Sarvam AI API adds this feature.
 
 **Tool/Function Calling**: The `bind_tools()` method is implemented for future compatibility, but **Sarvam AI does not currently support tool or function calling** in their API. When you bind tools, they will be stored but a warning will be issued indicating that the API won't use them. This feature will automatically work when Sarvam adds tool calling support.
 

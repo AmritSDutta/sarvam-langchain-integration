@@ -2,12 +2,12 @@
 import asyncio
 import logging
 import os
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.outputs import ChatResult, ChatGeneration
+from langchain_core.outputs import ChatResult, ChatGeneration, ChatGenerationChunk
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_function
@@ -218,6 +218,131 @@ class SarvamChat(BaseChatModel):
         )
 
         return ChatResult(generations=[generation], llm_output={"token_usage": token_usage})
+
+    def _stream(
+        self,
+        messages: Union[List[BaseMessage], str],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        """Stream the Sarvam API response.
+
+        Note: Sarvam AI API does not support streaming yet. This implementation
+        falls back to non-streaming and yields the complete response as a single chunk.
+        When Sarvam AI adds streaming support, this can be updated to use native streaming.
+
+        Args:
+            messages: The input messages to send to the model
+            stop: Optional list of stop strings
+            run_manager: Optional callback manager for run tracking
+            **kwargs: Additional arguments to pass to the model
+
+        Yields:
+            ChatGenerationChunk: A single chunk containing the complete response
+        """
+        if self._client is None:
+            self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
+
+        # Set LangSmith metadata for tracing
+        if run_manager:
+            run_manager.metadata.update({
+                "ls_provider": "sarvam",
+                "ls_model_name": self.model,
+            })
+
+        # Build request parameters (same as _generate)
+        params: Dict[str, Any] = {
+            "messages": self._convert_messages(messages),
+            "temperature": self.temperature,
+        }
+
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
+        if self.reasoning_effort is not None:
+            params["reasoning_effort"] = self.reasoning_effort
+        if self.wiki_grounding:
+            params["wiki_grounding"] = True
+        if self.max_retry:
+            params["request_options"] = RequestOptions(
+                max_retries=self.max_retry,
+            )
+        params["max_tokens"] = self.max_tokens
+
+        # Note: Sarvam API does not support tools/function calling yet
+        if self.bound_tools:
+            logger.info(
+                "Sarvam AI does not support tool/function calling yet. "
+                "Tools are bound but will not be used by the API. "
+                "This feature is for future compatibility."
+            )
+            logger.debug(f"Bound tools (not used): {[t.get('name') for t in self.bound_tools]}")
+
+        # Override with any additional kwargs (but exclude tools)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+        params.update(filtered_kwargs)
+
+        # Log API call at DEBUG level
+        logger.debug(
+            f"Calling Sarvam API: model={self.model}, "
+            f"messages={len(params['messages'])}, "
+            f"temperature={self.temperature}, "
+            f"reasoning_effort={self.reasoning_effort}, "
+            f"wiki_grounding={self.wiki_grounding}, "
+            f"max_tokens={self.max_tokens}, "
+            f"max_retries={self.max_retry}"
+        )
+
+        # Application-level retry
+        response = None
+        for attempt in range(self.max_retry):
+            try:
+                response = self._client.chat.completions(**params)
+                break
+            except ApiError as e:
+                if attempt < self.max_retry - 1:
+                    logger.warning(f"API error on attempt {attempt + 1}/{self.max_retry}: {e.body}. Retrying...")
+                    continue
+                # Final attempt failed - notify LangSmith and raise
+                if run_manager:
+                    run_manager.on_llm_error(e)
+                logger.error(f"Sarvam API error after {self.max_retry} attempts: {e.body}")
+                raise RuntimeError(f"Sarvam API error: {e.body}") from e
+
+        # Extract response
+        message = response.choices[0].message
+        raw_content = message.content
+        content = extract_after_think(raw_content)
+
+        # Build token usage info if available
+        token_usage = None
+        if hasattr(response, "usage") and response.usage:
+            input_tokens = getattr(response.usage, "prompt_tokens", 0)
+            output_tokens = getattr(response.usage, "completion_tokens", 0)
+            total_tokens = getattr(response.usage, "total_tokens", 0)
+
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int) and isinstance(total_tokens, int):
+                token_usage = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                }
+
+        # Log token usage at DEBUG level
+        if token_usage:
+            logger.debug(
+                f"Token usage: prompt={token_usage['input_tokens']}, "
+                f"completion={token_usage['output_tokens']}, "
+                f"total={token_usage['total_tokens']}"
+            )
+
+        # Yield as a single chunk
+        chunk = ChatGenerationChunk(
+            message=AIMessageChunk(content=content),
+            generation_info={"token_usage": token_usage}
+        )
+
+        yield chunk
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
