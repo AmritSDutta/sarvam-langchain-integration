@@ -39,7 +39,7 @@ class SarvamLLM(BaseLLM):
         default="high",
         description="Reasoning effort: low, medium, or high",
     )
-    wiki_grounding: bool = Field(default=True, description="Enable wiki grounding")
+    wiki_grounding: bool = Field(default=False, description="Enable wiki grounding")
     max_retry: int = 3
     max_tokens: int = Field(default=8192, ge=1, description="Maximum tokens to generate")
 

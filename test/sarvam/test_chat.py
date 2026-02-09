@@ -199,3 +199,31 @@ def test_chat_invoke_with_mixed_messages_and_strings():
         # Second should be string wrapped as user message
         assert call_args[1]["messages"][1]["content"] == "String 2"
         assert call_args[1]["messages"][1]["role"] == "user"
+
+
+def test_chat_default_wiki_grounding_is_false():
+    """Test that wiki_grounding defaults to False (v0.1.6+)."""
+    with patch("sarvam.chat.model.SarvamAI") as mock_sarvam:
+        mock_message = Mock()
+        mock_message.content = "Response"
+
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = Mock()
+        mock_client.chat.completions.return_value = mock_response
+        mock_sarvam.return_value = mock_client
+
+        # Create chat without specifying wiki_grounding
+        chat = SarvamChat(api_key="test-api-key")
+        assert chat.wiki_grounding is False, "wiki_grounding should default to False"
+
+        # Invoke and verify wiki_grounding is not in params (since False means it's not sent)
+        chat.invoke([HumanMessage(content="Test")])
+
+        call_args = mock_client.chat.completions.call_args
+        # wiki_grounding should not be in params when False (default behavior)
+        assert "wiki_grounding" not in call_args[1] or call_args[1]["wiki_grounding"] is False

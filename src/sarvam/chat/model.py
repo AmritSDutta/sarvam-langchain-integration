@@ -46,7 +46,7 @@ class SarvamChat(BaseChatModel):
         default="high",
         description="Reasoning effort: low, medium, or high",
     )
-    wiki_grounding: bool = Field(default=True, description="Enable wiki grounding")
+    wiki_grounding: bool = Field(default=False, description="Enable wiki grounding")
     bound_tools: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Tools bound to this model instance"
     )

@@ -132,7 +132,7 @@ Both classes use these defaults:
 - `temperature`: 0.5
 - `top_p`: 1.0
 - `reasoning_effort`: "high"
-- `wiki_grounding`: True
+- `wiki_grounding`: False
 - `max_tokens`: 8192
 - `max_retry`: 3
 

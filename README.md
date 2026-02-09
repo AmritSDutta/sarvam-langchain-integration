@@ -7,6 +7,7 @@
 
 LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM with native support for Hindi and other Indic languages.
 
+langchain-sarvam-integration is an opinionated Python library to harness Sarvam AI through LangChain, LangGraph, and LangSmith, bringing Sarvam’s LLMs and APIs cleanly into chains, agents, and RAG workflows. It enables generative chat, task orchestration, and multilingual use cases—especially for Indian languages—while keeping prompt and response handling predictable. The package standardizes Sarvam as a first-class provider across the LangChain ecosystem and is fully LangSmith-compliant for tracing and evaluation. In practice, it removes integration glue code so your architecture stays intentional instead of “creative.” Think of it as serious plumbing with just enough wit to keep your stack from leaking.
 ## ⚠️ AI-Assisted Development Disclaimer
 
 **~95% of this codebase was written by AI coding agents** (primarily [Claude Code](https://claude.ai/code)) with architectural guidance and review via GEMINI CLI.
@@ -478,7 +479,7 @@ Example output:
 | `temperature` | `float` | `0.5` | Sampling temperature (0-2) |
 | `top_p` | `float` | `1.0` | Nucleus sampling (0-1) |
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
-| `wiki_grounding` | `bool` | `True` | Enable wiki grounding for factual queries |
+| `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
 | `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
 
 ## Limitations

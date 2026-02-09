@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-02-09
+
+### Changed
+- **wiki_grounding default**: Changed default value from `True` to `False` to reduce API failures
+  - Wiki grounding when enabled can cause exponential increase in API error rates
+  - Users who need wiki grounding can explicitly enable it with `wiki_grounding=True`
+  - This improves reliability for general use cases
+
+### Added
+- Tests to verify default `wiki_grounding` value is `False` for both `SarvamChat` and `SarvamLLM`
+
 ## [0.1.5] - 2026-02-07
 
 ### Added
@@ -105,7 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool/function calling is implemented for future compatibility but not yet supported by Sarvam AI API
 - Streaming is not yet supported by Sarvam AI API
 
-[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.2...v0.1.3

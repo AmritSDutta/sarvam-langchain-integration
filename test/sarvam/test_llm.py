@@ -92,3 +92,31 @@ def test_llm_with_wiki_grounding():
 
         call_args = mock_client.chat.completions.call_args
         assert call_args[1]["wiki_grounding"] is True
+
+
+def test_llm_default_wiki_grounding_is_false():
+    """Test that wiki_grounding defaults to False (v0.1.6+)."""
+    with patch("sarvam.chat.llm.SarvamAI") as mock_sarvam:
+        mock_message = Mock()
+        mock_message.content = "Response"
+
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = Mock()
+        mock_client.chat.completions.return_value = mock_response
+        mock_sarvam.return_value = mock_client
+
+        # Create LLM without specifying wiki_grounding
+        llm = SarvamLLM(api_key="test-api-key")
+        assert llm.wiki_grounding is False, "wiki_grounding should default to False"
+
+        # Invoke and verify wiki_grounding is not in params (since False means it's not sent)
+        llm.invoke("Test")
+
+        call_args = mock_client.chat.completions.call_args
+        # wiki_grounding should not be in params when False (default behavior)
+        assert "wiki_grounding" not in call_args[1] or call_args[1]["wiki_grounding"] is False
