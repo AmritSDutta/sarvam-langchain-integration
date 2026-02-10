@@ -316,6 +316,7 @@ class SarvamChat(BaseChatModel):
 
         # Build token usage info if available
         token_usage = None
+        usage_metadata = None
         if hasattr(response, "usage") and response.usage:
             input_tokens = getattr(response.usage, "prompt_tokens", 0)
             output_tokens = getattr(response.usage, "completion_tokens", 0)
@@ -327,6 +328,7 @@ class SarvamChat(BaseChatModel):
                     "output_tokens": output_tokens,
                     "total_tokens": total_tokens,
                 }
+                usage_metadata = token_usage.copy()
 
         # Log token usage at DEBUG level
         if token_usage:
@@ -338,7 +340,10 @@ class SarvamChat(BaseChatModel):
 
         # Yield as a single chunk
         chunk = ChatGenerationChunk(
-            message=AIMessageChunk(content=content),
+            message=AIMessageChunk(
+                content=content,
+                **({"usage_metadata": usage_metadata} if usage_metadata else {})
+            ),
             generation_info={"token_usage": token_usage}
         )
 
