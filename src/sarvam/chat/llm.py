@@ -59,21 +59,33 @@ class SarvamLLM(BaseLLM):
 
         super().__init__(**kwargs)
         self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
-        self._last_token_usage = None  # For LangSmith token usage tracking
 
     @property
     def _llm_type(self) -> str:
         """Return type of LLM."""
         return "sarvam"
 
-    def _call(
+    def _call_with_usage(
         self,
         prompt: str,
         stop: Optional[List[str]] = None,
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
-    ) -> str:
-        """Call the Sarvam API."""
+    ) -> tuple[str, Optional[Dict[str, int]]]:
+        """Call the Sarvam API and return (text, token_usage) tuple.
+
+        This internal method returns both the response text and token usage,
+        allowing _generate() and _stream() to access token information directly.
+
+        Args:
+            prompt: The input prompt to send to the model
+            stop: Optional list of stop strings
+            run_manager: Optional callback manager for run tracking
+            **kwargs: Additional arguments to pass to the model
+
+        Returns:
+            A tuple of (response_text, token_usage_dict or None)
+        """
         if self._client is None:
             self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
 
@@ -156,14 +168,35 @@ class SarvamLLM(BaseLLM):
                 f"total={token_usage['total_tokens']}"
             )
 
-        # Store token_usage as an instance variable for _generate to access
-        self._last_token_usage = token_usage
-
         # Extract content after `` tag if present
         raw_content = response.choices[0].message.content
         content = extract_after_think(raw_content)
 
-        return content
+        return content, token_usage
+
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Call the Sarvam API.
+
+        This method wraps _call_with_usage() to maintain compatibility with
+        LangChain's BaseLLM interface which expects only a string return value.
+
+        Args:
+            prompt: The input prompt to send to the model
+            stop: Optional list of stop strings
+            run_manager: Optional callback manager for run tracking
+            **kwargs: Additional arguments to pass to the model
+
+        Returns:
+            The generated text response
+        """
+        text, _ = self._call_with_usage(prompt, stop, run_manager, **kwargs)
+        return text
 
     def _generate(
         self,
@@ -177,14 +210,14 @@ class SarvamLLM(BaseLLM):
         token_usage_sum = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
         for prompt in prompts:
-            text = self._call(prompt, stop, run_manager, **kwargs)
+            text, token_usage = self._call_with_usage(prompt, stop, run_manager, **kwargs)
             generations.append([Generation(text=text)])
 
             # Accumulate token usage
-            if hasattr(self, '_last_token_usage') and self._last_token_usage:
-                token_usage_sum["input_tokens"] += self._last_token_usage["input_tokens"]
-                token_usage_sum["output_tokens"] += self._last_token_usage["output_tokens"]
-                token_usage_sum["total_tokens"] += self._last_token_usage["total_tokens"]
+            if token_usage:
+                token_usage_sum["input_tokens"] += token_usage["input_tokens"]
+                token_usage_sum["output_tokens"] += token_usage["output_tokens"]
+                token_usage_sum["total_tokens"] += token_usage["total_tokens"]
 
         return LLMResult(
             generations=generations,
@@ -211,10 +244,14 @@ class SarvamLLM(BaseLLM):
             **kwargs: Additional arguments to pass to the model
 
         Yields:
-            GenerationChunk: A single chunk containing the complete response
+            GenerationChunk: A single chunk containing the complete response with token usage
         """
-        text = self._call(prompt, stop, run_manager, **kwargs)
-        chunk = GenerationChunk(text=text)
+        text, token_usage = self._call_with_usage(prompt, stop, run_manager, **kwargs)
+
+        chunk = GenerationChunk(
+            text=text,
+            generation_info={"token_usage": token_usage} if token_usage else None
+        )
 
         if run_manager:
             run_manager.on_llm_new_token(text, chunk=chunk)

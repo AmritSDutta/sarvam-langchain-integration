@@ -17,4 +17,4 @@ __all__ = [
     "extract_after_think",
 ]
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"

@@ -186,6 +186,44 @@ Both classes implement `_stream()` to:
 3. Yield a single `ChatGenerationChunk` (for SarvamChat) or `GenerationChunk` (for SarvamLLM) containing the complete response
 4. Support LangSmith tracing via token usage metadata
 
+### Streaming Token Tracking for LangSmith
+
+For proper LangSmith token tracking during streaming, both classes include token usage in their chunk outputs:
+
+**SarvamChat (`_stream()`)**:
+- Attaches `usage_metadata` to `AIMessageChunk` for LangSmith visibility
+- Token counts appear in LangSmith traces when using `stream()` or `astream()`
+
+```python
+# SarvamChat streaming with token tracking
+chunk = ChatGenerationChunk(
+    message=AIMessageChunk(
+        content=content,
+        **({"usage_metadata": usage_metadata} if usage_metadata else {})
+    ),
+    generation_info={"token_usage": token_usage}
+)
+```
+
+**SarvamLLM (`_stream()`)**:
+- Uses `_call_with_usage()` method that returns `(text, token_usage)` tuple
+- Includes `token_usage` in `generation_info` on `GenerationChunk`
+
+```python
+# SarvamLLM streaming with token tracking
+text, token_usage = self._call_with_usage(prompt, stop, run_manager, **kwargs)
+chunk = GenerationChunk(
+    text=text,
+    generation_info={"token_usage": token_usage} if token_usage else None
+)
+```
+
+**SarvamLLM Internal Pattern**:
+The `_call_with_usage()` method returns a tuple `(text, token_usage)` instead of storing tokens in an instance variable. This is cleaner and more reliable:
+- `_call()` wraps `_call_with_usage()` for backward compatibility with LangChain's `BaseLLM` interface
+- `_generate()` and `_stream()` call `_call_with_usage()` directly for explicit token handling
+- No fragile `_last_token_usage` instance variable needed
+
 ### Structured Output Utilities
 
 The `utils.py` module provides functions to extract JSON from Sarvam AI responses:

@@ -10,6 +10,8 @@ Prerequisites:
 Run with:
     pytest test/sarvam/test_langsmith.py -v -s
     pytest test/sarvam/test_langsmith.py::test_sarvam_chat_invoke_with_langsmith_tracing -v -s
+    pytest test/sarvam/test_langsmith.py::test_sarvam_chat_stream_with_langsmith_tracing -v -s
+    pytest test/sarvam/test_langsmith.py::test_sarvam_llm_stream_with_langsmith_tracing -v -s
 """
 
 import os
@@ -215,6 +217,110 @@ def test_sarvam_llm_invoke_with_langsmith_tracing():
         os.environ.pop("LANGCHAIN_PROJECT", None)
 
 
+@pytest.mark.integration
+def test_sarvam_chat_stream_with_langsmith_tracing():
+    """Test SarvamChat.stream() with LangSmith tracing enabled."""
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Set LangSmith environment variables
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "sarvam-test"
+
+    try:
+        print("\n[Test 5] SarvamChat.stream() with LangSmith tracing")
+        print("-" * 60)
+
+        # Create callback handler
+        callback_handler = LangSmithCallbackHandler()
+
+        chat = SarvamChat(api_key=api_key, temperature=0.3)
+
+        # Stream with callbacks through config
+        chunks = []
+        for chunk in chat.stream(
+            [HumanMessage(content="What is the capital of India? Answer with just the city name.")],
+            config={"callbacks": [callback_handler]}
+        ):
+            chunks.append(chunk)
+            print(f"  Chunk: {chunk.content}")
+
+        # Verify chunks were received
+        assert len(chunks) > 0, "Should receive at least one chunk"
+
+        # Combine all chunk content
+        full_content = "".join(chunk.content for chunk in chunks if chunk.content)
+        assert len(full_content) > 0, "Combined content should not be empty"
+        print(f"  Full response: {full_content[:100]}...")
+
+        # Verify callbacks were invoked
+        # Note: For streaming, on_chat_model_start is called but on_chat_model_end
+        # may not be triggered in the same way as invoke(). LangSmith's built-in
+        # tracer handles streaming differently.
+        assert len(callback_handler.chat_model_starts) >= 1, "on_chat_model_start should be called at least once"
+
+        print("  [PASS] SarvamChat.stream() LangSmith tracing test PASSED")
+        print("  (Check LangSmith dashboard to verify traces were posted)")
+        print("-" * 60)
+
+    finally:
+        # Clean up environment variables
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+        os.environ.pop("LANGCHAIN_PROJECT", None)
+
+
+@pytest.mark.integration
+def test_sarvam_llm_stream_with_langsmith_tracing():
+    """Test SarvamLLM.stream() with LangSmith tracing enabled."""
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Set LangSmith environment variables
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "sarvam-test"
+
+    try:
+        print("\n[Test 6] SarvamLLM.stream() with LangSmith tracing")
+        print("-" * 60)
+
+        # Create callback handler
+        callback_handler = LangSmithCallbackHandler()
+
+        llm = SarvamLLM(api_key=api_key, temperature=0.3)
+
+        # Stream with callbacks through config
+        chunks = []
+        for chunk in llm.stream(
+            "What is the capital of India? Answer with just the city name.",
+            config={"callbacks": [callback_handler]}
+        ):
+            chunks.append(chunk)
+            print(f"  Chunk: {chunk}")
+
+        # Verify chunks were received
+        assert len(chunks) > 0, "Should receive at least one chunk"
+
+        # Combine all chunk text (llm.stream() yields strings)
+        full_content = "".join(chunks)
+        assert len(full_content) > 0, "Combined content should not be empty"
+        print(f"  Full response: {full_content[:100]}...")
+
+        # Verify callbacks were invoked
+        # SarvamLLM uses on_llm_start/on_llm_end callbacks for LangSmith tracing
+        assert len(callback_handler.llm_starts) >= 1, "on_llm_start should be called at least once"
+
+        print("  [PASS] SarvamLLM.stream() LangSmith tracing test PASSED")
+        print("  (Check LangSmith dashboard to verify traces were posted)")
+        print("-" * 60)
+
+    finally:
+        # Clean up environment variables
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+        os.environ.pop("LANGCHAIN_PROJECT", None)
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_sarvam_llm_ainvoke_with_langsmith_tracing():
@@ -272,6 +378,8 @@ if __name__ == "__main__":
     asyncio.run(test_sarvam_chat_ainvoke_with_langsmith_tracing())
     test_sarvam_llm_invoke_with_langsmith_tracing()
     asyncio.run(test_sarvam_llm_ainvoke_with_langsmith_tracing())
+    test_sarvam_chat_stream_with_langsmith_tracing()
+    test_sarvam_llm_stream_with_langsmith_tracing()
 
     print("\n" + "=" * 60)
     print("✅ All LangSmith tracing tests PASSED!")

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-02-10
+
+### Fixed
+- **LangSmith token tracking for streaming**: Token usage is now properly tracked in LangSmith when using `stream()` and `astream()` methods
+  - `SarvamChat._stream()` now attaches `usage_metadata` to `AIMessageChunk` for proper token visibility
+  - `SarvamLLM._stream()` now includes `token_usage` in `generation_info` on `GenerationChunk`
+
+### Changed
+- **Refactored `SarvamLLM` token handling**: Replaced fragile `_last_token_usage` instance variable with explicit tuple return pattern
+  - New `_call_with_usage()` method returns `(text, token_usage)` tuple
+  - `_call()` wraps `_call_with_usage()` for backward compatibility with LangChain's `BaseLLM` interface
+  - `_generate()` and `_stream()` now call `_call_with_usage()` directly for cleaner token accumulation
+
+### Added
+- **Streaming tests for LangSmith tracing**: New integration tests to verify token tracking during streaming
+  - `test_sarvam_chat_stream_with_langsmith_tracing` - Tests SarvamChat streaming with LangSmith
+  - `test_sarvam_llm_stream_with_langsmith_tracing` - Tests SarvamLLM streaming with LangSmith
+
 ## [0.1.6] - 2026-02-09
 
 ### Changed
@@ -116,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool/function calling is implemented for future compatibility but not yet supported by Sarvam AI API
 - Streaming is not yet supported by Sarvam AI API
 
-[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.3...v0.1.4

@@ -8,7 +8,10 @@
 LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM with native support for Hindi and other Indic languages.
 
 langchain-sarvam-integration is an opinionated Python library to harness Sarvam AI through LangChain, LangGraph, and LangSmith, bringing Sarvam’s LLMs and APIs cleanly into chains, agents, and RAG workflows. It enables generative chat, task orchestration, and multilingual use cases—especially for Indian languages—while keeping prompt and response handling predictable. The package standardizes Sarvam as a first-class provider across the LangChain ecosystem and is fully LangSmith-compliant for tracing and evaluation. In practice, it removes integration glue code so your architecture stays intentional instead of “creative.” Think of it as serious plumbing with just enough wit to keep your stack from leaking.
+
+#### ⚠️ Note: Tool calling not properly supported from sarvam. Use for chatbots and RAG systems, not LangChain agents.
 ## ⚠️ AI-Assisted Development Disclaimer
+
 
 **~95% of this codebase was written by AI coding agents** (primarily [Claude Code](https://claude.ai/code)) with architectural guidance and review via GEMINI CLI.
 
@@ -481,6 +484,59 @@ Example output:
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
 | `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
 | `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
+
+## LangSmith Integration
+
+Both `SarvamChat` and `SarvamLLM` support [LangSmith](https://www.langchain.com/langsmith) tracing out of the box for LLM observability, debugging, and cost tracking.
+
+### Setup
+
+Enable LangSmith by setting environment variables:
+
+```bash
+export LANGCHAIN_TRACING_V2="true"
+export LANGCHAIN_API_KEY="your-langsmith-api-key"
+export LANGCHAIN_PROJECT="your-project-name"
+```
+
+### Automatic Token Tracking
+
+Token usage is automatically tracked and sent to LangSmith for all operations:
+
+```python
+from sarvam import SarvamChat
+from langchain_core.messages import HumanMessage
+
+chat = SarvamChat()
+
+# Token counts automatically appear in LangSmith
+response = chat.invoke([HumanMessage(content="Hello!")])
+
+# Also works with streaming
+for chunk in chat.stream("Tell me a story"):
+    print(chunk.content, end="")
+
+# And async operations
+import asyncio
+async def main():
+    response = await chat.ainvoke([HumanMessage(content="Hello!")])
+asyncio.run(main())
+```
+
+### What's Tracked
+
+- **Token counts**: `input_tokens`, `output_tokens`, `total_tokens`
+- **Model metadata**: Provider (`sarvam`), model name, parameters
+- **Latency**: Request duration and timing
+- **Errors**: API failures with error details
+
+### View Traces
+
+After running your code, visit [smith.langchain.com](https://smith.langchain.com) to view:
+- Request/response pairs
+- Token usage and costs
+- Latency metrics
+- Error traces
 
 ## Limitations
 
