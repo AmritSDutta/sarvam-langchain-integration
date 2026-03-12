@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-03-12
+
+### Fixed
+- **Critical: Missing model parameter in streaming**: Fixed bug where `model` parameter was not passed to Sarvam AI API in streaming methods
+  - `SarvamChat._stream()` now includes `"model": self.model` in API request params
+  - `SarvamLLM._call_with_usage()` now includes `"model": self.model` in API request params
+  - This bug would cause API errors when using streaming methods with non-default models
+
+### Changed
+- **Updated SDK**: sarvamai dependency bumped from 0.1.24 to 0.1.26
+
+### Added
+- **Model-specific integration tests**: New test files for sarvam-105b and sarvam-30b models
+  - `test/sarvam/test_integration_105b.py` - 9 integration tests for sarvam-105b model
+  - `test/sarvam/test_integration_30b.py` - 9 integration tests for sarvam-30b model
+- **Model-specific LangSmith tests**: Added LangSmith tracing tests for both models
+  - `test_sarvam_chat_invoke_with_langsmith_tracing_105b` - Tests sarvam-105b with LangSmith
+  - `test_sarvam_chat_invoke_with_langsmith_tracing_30b` - Tests sarvam-30b with LangSmith
+
 ## [0.1.7] - 2026-02-10
 
 ### Fixed
@@ -134,8 +153,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool/function calling is implemented for future compatibility but not yet supported by Sarvam AI API
 - Streaming is not yet supported by Sarvam AI API
 
-[Unreleased]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.7...HEAD
-[0.1.7]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.6...v0.1.7
+[Unreleased]: https://github.com/AmritSDutta/sarvam_lanchchain_integration/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/AmritSDutta/sarvam_lanchchain_integration/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/AmritSDutta/sarvam_lanchchain_integration/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/your-username/langchain-sarvam-integration/compare/v0.1.3...v0.1.4
