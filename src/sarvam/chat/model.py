@@ -118,6 +118,7 @@ class SarvamChat(BaseChatModel):
 
         # Build request parameters
         params: Dict[str, Any] = {
+            "model": self.model,
             "messages": self._convert_messages(messages),
             "temperature": self.temperature,
         }
@@ -253,6 +254,7 @@ class SarvamChat(BaseChatModel):
 
         # Build request parameters (same as _generate)
         params: Dict[str, Any] = {
+            "model": self.model,
             "messages": self._convert_messages(messages),
             "temperature": self.temperature,
         }

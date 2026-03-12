@@ -1,5 +1,4 @@
 """Sarvam LLM implementation for LangChain."""
-import asyncio
 import os
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -98,6 +97,7 @@ class SarvamLLM(BaseLLM):
 
         # Build request parameters
         params: Dict[str, Any] = {
+            "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": self.temperature,
         }

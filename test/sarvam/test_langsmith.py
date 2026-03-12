@@ -368,6 +368,114 @@ async def test_sarvam_llm_ainvoke_with_langsmith_tracing():
         os.environ.pop("LANGCHAIN_PROJECT", None)
 
 
+@pytest.mark.integration
+def test_sarvam_chat_invoke_with_langsmith_tracing_105b():
+    """Test SarvamChat.invoke() with sarvam-105b model and LangSmith tracing enabled."""
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Set LangSmith environment variables
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "sarvam-test"
+
+    try:
+        print("\n[Test 105b] SarvamChat.invoke() with sarvam-105b model and LangSmith tracing")
+        print("-" * 60)
+
+        # Create callback handler
+        callback_handler = LangSmithCallbackHandler()
+
+        chat = SarvamChat(api_key=api_key, model="sarvam-105b", temperature=0.3)
+
+        # Invoke with callbacks through config
+        response = chat.invoke(
+            [HumanMessage(content="What is the capital of India? Answer with just the city name.")],
+            config={"callbacks": [callback_handler]}
+        )
+
+        # Verify response
+        assert response.content is not None
+        assert isinstance(response.content, str)
+        assert len(response.content) > 0
+        print(f"  Response: {response.content[:100]}...")
+
+        # Check usage_metadata (LangChain 0.1+) - Required for LangSmith tracing
+        assert hasattr(response, 'usage_metadata'), "Response should have usage_metadata for LangSmith tracing"
+        assert response.usage_metadata is not None, "usage_metadata should not be None"
+        print(f"  Usage metadata: {response.usage_metadata}")
+        assert 'input_tokens' in response.usage_metadata, "usage_metadata should contain input_tokens"
+        assert 'output_tokens' in response.usage_metadata, "usage_metadata should contain output_tokens"
+        assert 'total_tokens' in response.usage_metadata, "usage_metadata should contain total_tokens"
+
+        # Verify token counts are positive integers
+        assert response.usage_metadata['input_tokens'] > 0, "input_tokens should be positive"
+        assert response.usage_metadata['output_tokens'] > 0, "output_tokens should be positive"
+        assert response.usage_metadata['total_tokens'] > 0, "total_tokens should be positive"
+
+        print("  [PASS] SarvamChat.invoke() with sarvam-105b LangSmith tracing test PASSED")
+        print("-" * 60)
+
+    finally:
+        # Clean up environment variables
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+        os.environ.pop("LANGCHAIN_PROJECT", None)
+
+
+@pytest.mark.integration
+def test_sarvam_chat_invoke_with_langsmith_tracing_30b():
+    """Test SarvamChat.invoke() with sarvam-30b model and LangSmith tracing enabled."""
+    api_key = os.environ.get("SARVAM_API_KEY")
+    if not api_key:
+        pytest.skip("SARVAM_API_KEY environment variable not set")
+
+    # Set LangSmith environment variables
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "sarvam-test"
+
+    try:
+        print("\n[Test 30b] SarvamChat.invoke() with sarvam-30b model and LangSmith tracing")
+        print("-" * 60)
+
+        # Create callback handler
+        callback_handler = LangSmithCallbackHandler()
+
+        chat = SarvamChat(api_key=api_key, model="sarvam-30b", temperature=0.3)
+
+        # Invoke with callbacks through config
+        response = chat.invoke(
+            [HumanMessage(content="What is the capital of India? Answer with just the city name.")],
+            config={"callbacks": [callback_handler]}
+        )
+
+        # Verify response
+        assert response.content is not None
+        assert isinstance(response.content, str)
+        assert len(response.content) > 0
+        print(f"  Response: {response.content[:100]}...")
+
+        # Check usage_metadata (LangChain 0.1+) - Required for LangSmith tracing
+        assert hasattr(response, 'usage_metadata'), "Response should have usage_metadata for LangSmith tracing"
+        assert response.usage_metadata is not None, "usage_metadata should not be None"
+        print(f"  Usage metadata: {response.usage_metadata}")
+        assert 'input_tokens' in response.usage_metadata, "usage_metadata should contain input_tokens"
+        assert 'output_tokens' in response.usage_metadata, "usage_metadata should contain output_tokens"
+        assert 'total_tokens' in response.usage_metadata, "usage_metadata should contain total_tokens"
+
+        # Verify token counts are positive integers
+        assert response.usage_metadata['input_tokens'] > 0, "input_tokens should be positive"
+        assert response.usage_metadata['output_tokens'] > 0, "output_tokens should be positive"
+        assert response.usage_metadata['total_tokens'] > 0, "total_tokens should be positive"
+
+        print("  [PASS] SarvamChat.invoke() with sarvam-30b LangSmith tracing test PASSED")
+        print("-" * 60)
+
+    finally:
+        # Clean up environment variables
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+        os.environ.pop("LANGCHAIN_PROJECT", None)
+
+
 if __name__ == "__main__":
     # Run tests manually with real API calls
     print("=" * 60)
