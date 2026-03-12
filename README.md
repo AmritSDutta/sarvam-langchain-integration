@@ -21,6 +21,7 @@ This project demonstrates modern AI-assisted software development practices, wit
 
 - 🤖 **SarvamLLM** - Simple prompt-response interface
 - 💬 **SarvamChat** - Multi-turn conversation support
+- 🎯 **Multiple Models** - Support for sarvam-m, sarvam-105b, and sarvam-30b models
 - ⚡ **Async Support** - Non-blocking async operations
 - 🌊 **Streaming Support** - Real-time response streaming
 - 🧠 **Reasoning Mode** - Built-in thinking capability
@@ -478,12 +479,42 @@ Example output:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `api_key` | `str` | `None` | Sarvam API key (or use `SARVAM_API_KEY` env var) |
-| `model` | `str` | `"sarvam-m"` | Model to use |
+| `model` | `str` | `"sarvam-m"` | Model to use: `"sarvam-m"`, `"sarvam-105b"`, or `"sarvam-30b"` |
 | `temperature` | `float` | `0.5` | Sampling temperature (0-2) |
 | `top_p` | `float` | `1.0` | Nucleus sampling (0-1) |
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
 | `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
 | `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
+
+### Available Models
+
+- **sarvam-m**: Default model, good for general-purpose tasks
+- **sarvam-105b**: Larger model (105B parameters) for more complex reasoning and better quality responses
+- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed
+
+### Using Different Models
+
+```python
+from sarvam import SarvamChat, SarvamLLM
+
+# Use the default sarvam-m model
+chat_default = SarvamChat()
+
+# Use sarvam-105b for more complex tasks
+chat_105b = SarvamChat(model="sarvam-105b")
+response = chat_105b.invoke([HumanMessage(content="Explain quantum entanglement in detail")])
+
+# Use sarvam-30b for balanced performance
+llm_30b = SarvamLLM(model="sarvam-30b")
+response = llm_30b.invoke("Summarize the key events of the Indian independence movement")
+
+# You can also use models with other parameters
+chat = SarvamChat(
+    model="sarvam-105b",
+    temperature=0.3,
+    reasoning_effort="high"
+)
+```
 
 ## LangSmith Integration
 
@@ -569,7 +600,15 @@ pip install -e ".[dev]"
 Run tests:
 
 ```bash
+# Run all tests (unit + integration - requires API key)
 pytest
+
+# Run only unit tests (no API key required)
+pytest -m "not integration"
+
+# Run model-specific integration tests
+pytest test/sarvam/test_integration_105b.py -v
+pytest test/sarvam/test_integration_30b.py -v
 ```
 
 Format code:
@@ -602,6 +641,8 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
 
 - [Sarvam AI Documentation](https://docs.sarvam.ai/)
 - [Sarvam-M Model](https://docs.sarvam.ai/api-reference-docs/getting-started/models/sarvam-m)
+- [Sarvam-105b Model](https://docs.sarvam.ai/api-reference-docs/getting-started/models/sarvam-105b)
+- [Sarvam-30b Model](https://docs.sarvam.ai/api-reference-docs/getting-started/models/sarvam-30b)
 - [LangChain Documentation](https://python.langchain.com/)
 - [PyPI Package](https://pypi.org/project/langchain-sarvam-integration/)
 

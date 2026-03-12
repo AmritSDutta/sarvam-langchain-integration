@@ -67,6 +67,7 @@ src/sarvam/
 ### Core Classes
 
 Both `SarvamChat` and `SarvamLLM` wrap the `sarvamai.SarvamAI` client's `chat.completions()` API. They support:
+- **Multiple models**: `sarvam-m` (default), `sarvam-105b`, and `sarvam-30b`
 - Flexible input handling via `_convert_messages()` (strings, BaseMessages, or mixed lists)
 - LangSmith tracing with automatic token usage tracking and metadata
 - Async operations via `super().ainvoke()` (parent handles thread pool)
@@ -129,12 +130,38 @@ mock_sarvam.return_value = mock_client
 ### Default Parameter Values
 
 Both classes use these defaults:
+- `model`: "sarvam-m"
 - `temperature`: 0.5
 - `top_p`: 1.0
 - `reasoning_effort`: "high"
 - `wiki_grounding`: False
 - `max_tokens`: 8192
 - `max_retry`: 3
+
+### Available Models
+
+The integration supports three Sarvam AI models:
+
+- **sarvam-m**: Default model, efficient for general-purpose tasks
+- **sarvam-105b**: Larger model (105B parameters) for complex reasoning and higher quality responses
+- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed
+
+To use a specific model:
+
+```python
+from sarvam import SarvamChat, SarvamLLM
+
+# Default model (sarvam-m)
+chat = SarvamChat()
+
+# sarvam-105b for complex tasks
+chat_105b = SarvamChat(model="sarvam-105b")
+
+# sarvam-30b for balanced performance
+llm_30b = SarvamLLM(model="sarvam-30b")
+```
+
+**Note**: The `model` parameter must be included in API request params. This was fixed in version 0.1.8 to ensure streaming methods work correctly with non-default models.
 
 ### `` Tag Extraction
 
@@ -241,7 +268,9 @@ Sarvam AI often includes reasoning text before JSON output (especially with `rea
 - `test/sarvam/test_structured_output.py` - Tests for JSON parsing and task planning
 - `test/sarvam/test_utils.py` - Tests for utility functions
 - `test/sarvam/test_async.py` - Tests for async functionality
-- `test/sarvam/test_integration.py` - Integration tests (marked with `@pytest.mark.integration`, requires `SARVAM_API_KEY`)
+- `test/sarvam/test_integration.py` - Integration tests with default model (marked with `@pytest.mark.integration`, requires `SARVAM_API_KEY`)
+- `test/sarvam/test_integration_105b.py` - Integration tests for sarvam-105b model (9 tests)
+- `test/sarvam/test_integration_30b.py` - Integration tests for sarvam-30b model (9 tests)
 - `test/sarvam/test_langsmith.py` - LangSmith tracing tests (requires `SARVAM_API_KEY`)
 
 ## API Key Requirements
