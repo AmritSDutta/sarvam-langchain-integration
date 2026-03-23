@@ -62,7 +62,8 @@ def test_llm_invoke_tools():
     # Verify tools are bound (stored but not used by API)
     assert bound_chat.bound_tools is not None
     assert len(bound_chat.bound_tools) == 1
-    print(f"[OK] Bound tool: {bound_chat.bound_tools[0]['name']}")
+    # Tools are wrapped in {"type": "function", "function": {...}} format
+    print(f"[OK] Bound tool: {bound_chat.bound_tools[0]['function']['name']}")
 
     # Invoke - should log INFO message about tools not being supported
     response = bound_chat.invoke([HumanMessage(content="What is the weather in Delhi?")])
@@ -72,7 +73,9 @@ def test_llm_invoke_tools():
     assert isinstance(response.content, str)
     assert len(response.content) > 0
 
-    print(f"Response: {response.content}")
+    # Handle Unicode for Windows console
+    safe_content = response.content.encode('ascii', errors='replace').decode('ascii')
+    print(f"Response: {safe_content}")
     # Model should answer directly (not using tools)
     assert any(word in response.content.lower() for word in ["delhi", "weather", "temperature", "india"])
 
@@ -311,7 +314,7 @@ def test_think_tag_extraction_with_real_api():
 
     response = chat.invoke([HumanMessage(content=prompt)])
 
-    print(f"  Response content: {response.content[:100]}...")
+    print(f"  Response content: {response.content[:100].encode('ascii', errors='replace').decode('ascii')}...")
 
     # Verify we got a response
     assert response.content is not None
@@ -328,6 +331,6 @@ def test_think_tag_extraction_with_real_api():
     assert any(word in response.content.lower() for word in ["delhi", "new delhi"]), \
         f"Expected city name in response, got: {response.content}"
 
-    print(f"  Final extracted answer: {response.content}")
+    print(f"  Final extracted answer: {response.content.encode('ascii', errors='replace').decode('ascii')}")
     print("  [PASS] `` tag extraction test PASSED")
     print("-" * 60)

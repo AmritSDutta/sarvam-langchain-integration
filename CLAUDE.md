@@ -121,11 +121,88 @@ mock_sarvam.return_value = mock_client
 
 ### Tool/Function Calling Status
 
-**Sarvam AI does not currently support tool/function calling.** The `bind_tools()` method in `SarvamChat` is implemented for future compatibility:
-- Tools are stored in the `bound_tools` field
-- A warning is logged when tools are bound
-- Tools are NOT passed to the API
-- Implementation will work automatically when Sarvam adds support
+**Sarvam AI supports tool/function calling for specific models only.**
+
+The `bind_tools()` method in `SarvamChat` works conditionally based on the model:
+- **sarvam-30b, sarvam-30b-16k, sarvam-105b, sarvam-105b-32k**: Tools ARE passed to the API
+- **sarvam-m**: Tools are NOT supported (logged as info, not passed to API)
+
+The implementation includes:
+- Tools stored in the `bound_tools` field
+- Model-specific tool support via `_supports_tools()` helper method
+- `tool_choice` parameter to control tool selection behavior
+- Tool calls extracted from API responses into `AIMessage.additional_kwargs["tool_calls"]`
+- `ToolMessage` support for multi-turn conversations with tools
+
+### Tool Calling Protocol
+
+When using tool calling with supported models (sarvam-30b, sarvam-105b, sarvam-30b-16k, sarvam-105b-32k), the interaction follows a multi-turn protocol based on the OpenAI tool calling standard:
+
+**1. First Response**: Model may return `tool_calls` with blank/empty `content`
+
+This is **expected behavior** - the model is requesting to use tools:
+
+```python
+from sarvam import SarvamChat
+from langchain_core.tools import tool
+from langchain_core.messages import ToolMessage, HumanMessage
+import json
+
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    return f"Sunny and 25°C in {location}"
+
+chat = SarvamChat(model="sarvam-30b")
+bound_chat = chat.bind_tools([get_weather])
+
+# First API call
+response = bound_chat.invoke("What's the weather in Mumbai?")
+
+# Check if model wants to use tools
+if "tool_calls" in response.additional_kwargs:
+    # response.content may be empty or blank - this is EXPECTED
+    # The model is requesting tool use, not providing text
+    print(f"Content: '{response.content}'")  # Might be "" or very brief
+```
+
+**2. Tool Result Submission**: Send tool results back via `ToolMessage`
+
+After extracting tool calls, execute the tools and submit results:
+
+```python
+messages = [
+    HumanMessage("What's the weather in Mumbai?"),
+    response  # First response with tool_calls
+]
+
+# Execute tools and add results
+for tool_call in response.additional_kwargs["tool_calls"]:
+    # Parse arguments and execute the tool
+    args = json.loads(tool_call["function"]["arguments"])
+    result = get_weather(**args)
+
+    # Add tool result to conversation
+    messages.append(ToolMessage(
+        content=result,
+        tool_call_id=tool_call["id"]
+    ))
+
+# Second API call - get final response
+final_response = bound_chat.invoke(messages)
+# Now final_response.content contains the actual answer
+```
+
+**3. Second Response**: Model returns the actual text content
+
+After processing tool results, the model provides a comprehensive text response with non-blank `content`.
+
+**Key Implementation Notes**:
+- Blank content on tool call requests is **correct behavior** per the OpenAI tool calling protocol
+- Always check `response.additional_kwargs["tool_calls"]` for tool requests
+- Use `ToolMessage` to submit tool results back to the model
+- The second call after tool execution will have the actual text response
+- This multi-turn pattern is standard for all OpenAI-compatible tool calling implementations
 
 ### Default Parameter Values
 
@@ -137,14 +214,17 @@ Both classes use these defaults:
 - `wiki_grounding`: False
 - `max_tokens`: 8192
 - `max_retry`: 3
+- `tool_choice`: None
 
 ### Available Models
 
-The integration supports three Sarvam AI models:
+The integration supports five Sarvam AI models:
 
-- **sarvam-m**: Default model, efficient for general-purpose tasks
-- **sarvam-105b**: Larger model (105B parameters) for complex reasoning and higher quality responses
-- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed
+- **sarvam-m**: Default model, efficient for general-purpose tasks (does NOT support tools)
+- **sarvam-105b**: Larger model (105B parameters) for complex reasoning and higher quality responses (supports tools)
+- **sarvam-105b-32k**: Extended context variant (32k tokens) with same capabilities as sarvam-105b (supports tools)
+- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed (supports tools)
+- **sarvam-30b-16k**: Extended context variant (16k tokens) with same capabilities as sarvam-30b (supports tools)
 
 To use a specific model:
 
@@ -156,6 +236,16 @@ chat = SarvamChat()
 
 # sarvam-105b for complex tasks
 chat_105b = SarvamChat(model="sarvam-105b")
+
+# sarvam-105b-32k for extended context (32k tokens)
+chat_105b_32k = SarvamChat(model="sarvam-105b-32k")
+
+# sarvam-30b for balanced performance
+llm_30b = SarvamLLM(model="sarvam-30b")
+
+# sarvam-30b-16k for extended context (16k tokens)
+llm_30b_16k = SarvamLLM(model="sarvam-30b-16k")
+```
 
 # sarvam-30b for balanced performance
 llm_30b = SarvamLLM(model="sarvam-30b")
@@ -265,6 +355,7 @@ Sarvam AI often includes reasoning text before JSON output (especially with `rea
 - `test/sarvam/test_chat.py` - Unit tests for SarvamChat (mocked API)
 - `test/sarvam/test_llm.py` - Unit tests for SarvamLLM (mocked API)
 - `test/sarvam/test_tools.py` - Unit tests for bind_tools functionality
+- `test/sarvam/test_tools_all_models.py` - Comprehensive tests for tool calling across all 5 Sarvam models (28 tests)
 - `test/sarvam/test_structured_output.py` - Tests for JSON parsing and task planning
 - `test/sarvam/test_utils.py` - Tests for utility functions
 - `test/sarvam/test_async.py` - Tests for async functionality

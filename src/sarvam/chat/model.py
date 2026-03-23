@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
 
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration, ChatGenerationChunk
@@ -28,13 +28,17 @@ _FEATURE_TOOLS_NOT_SUPPORTED = "tools_not_supported"
 class SarvamChat(BaseChatModel):
     """Sarvam Chat Model wrapper for LangChain.
 
+    Supports tool/function calling for sarvam-30b, sarvam-30b-16k, sarvam-105b, and sarvam-105b-32k models.
+    sarvam-m does not support tools.
+
     Args:
         api_key: Sarvam API subscription key
-        model: Model name to use (default: "sarvam-m")
+        model: Model name to use (default: "sarvam-m"). Options: "sarvam-m", "sarvam-30b", "sarvam-30b-16k", "sarvam-105b", "sarvam-105b-32k"
         temperature: Sampling temperature (0-2)
         top_p: Nucleus sampling parameter
         reasoning_effort: Reasoning effort level ("low", "medium", "high")
         wiki_grounding: Enable wiki grounding for factual queries
+        tool_choice: Tool choice mode (only for tool-supporting models): "none", "auto", "required", or specific tool
         **kwargs: Additional arguments
     """
 
@@ -49,6 +53,11 @@ class SarvamChat(BaseChatModel):
     wiki_grounding: bool = Field(default=False, description="Enable wiki grounding")
     bound_tools: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Tools bound to this model instance"
+    )
+    tool_choice: Optional[str] = Field(
+        default=None,
+        description="Tool choice mode: none, auto, required, or specific tool name. "
+        "Only applicable for sarvam-30b and sarvam-105b models.",
     )
     max_retry: int = 3
     max_tokens: int = Field(default=8192, ge=1, description="Maximum tokens to generate")
@@ -69,6 +78,19 @@ class SarvamChat(BaseChatModel):
 
         super().__init__(**kwargs)
         self._client = SarvamAI(api_subscription_key=self.api_key.get_secret_value())
+
+    def _supports_tools(self) -> bool:
+        """Check if the current model supports tool/function calling.
+
+        Returns:
+            True if the model supports tools (sarvam-30b, sarvam-105b and their variants), False otherwise.
+        """
+        return self.model in [
+            "sarvam-30b",
+            "sarvam-30b-16k",
+            "sarvam-105b",
+            "sarvam-105b-32k",
+        ]
 
     @property
     def _llm_type(self) -> str:
@@ -92,6 +114,13 @@ class SarvamChat(BaseChatModel):
                 converted.append({"role": "assistant", "content": msg.content})
             elif isinstance(msg, SystemMessage):
                 converted.append({"role": "system", "content": msg.content})
+            elif isinstance(msg, ToolMessage):
+                # ToolMessage requires tool_call_id and content
+                converted.append({
+                    "role": "tool",
+                    "content": msg.content,
+                    "tool_call_id": msg.tool_call_id,
+                })
             else:
                 # Fallback for unknown message types
                 content = msg if isinstance(msg, str) else getattr(msg, "content", str(msg))
@@ -135,18 +164,22 @@ class SarvamChat(BaseChatModel):
             )
         params["max_tokens"] = self.max_tokens
 
-        # Note: Sarvam API does not support tools/function calling yet
-        # Tools are stored in bound_tools but not passed to API
-        # This is for future compatibility when Sarvam adds support
-        if self.bound_tools:
+        # Handle tool/function calling - model-specific support
+        # sarvam-30b and sarvam-105b support tools, sarvam-m does not
+        if self.bound_tools and self._supports_tools():
+            # Pass tools to API for models that support it
+            params["tools"] = self.bound_tools
+            if self.tool_choice:
+                params["tool_choice"] = self.tool_choice
+            logger.debug(f"Tools passed to API for {self.model}: {[t['function']['name'] for t in self.bound_tools]}")
+        elif self.bound_tools and not self._supports_tools():
             logger.info(
-                "Sarvam AI does not support tool/function calling yet. "
-                "Tools are bound but will not be used by the API. "
-                "This feature is for future compatibility."
+                f"Tool calling not supported for {self.model}. Tools will be ignored. "
+                f"Use sarvam-30b or sarvam-105b for tool support."
             )
-            logger.debug(f"Bound tools (not used): {[t.get('name') for t in self.bound_tools]}")
+            logger.debug(f"Bound tools (not used): {[t['function']['name'] for t in self.bound_tools]}")
 
-        # Override with any additional kwargs (but exclude tools)
+        # Override with any additional kwargs (tools already handled above)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
         params.update(filtered_kwargs)
 
@@ -183,6 +216,29 @@ class SarvamChat(BaseChatModel):
         raw_content = message.content
         content = extract_after_think(raw_content)
 
+        # Handle tool calls in the response (for models that support tools)
+        additional_kwargs = {}
+        finish_reason = None
+        if hasattr(message, "tool_calls") and message.tool_calls and isinstance(message.tool_calls, list):
+            # Extract tool calls and store in additional_kwargs
+            tool_calls_data = []
+            for tc in message.tool_calls:
+                tool_calls_data.append({
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }
+                })
+            additional_kwargs["tool_calls"] = tool_calls_data
+            logger.debug(f"Tool calls received: {len(tool_calls_data)} calls")
+
+        # Get finish reason if available
+        if hasattr(response.choices[0], "finish_reason"):
+            finish_reason = response.choices[0].finish_reason
+            logger.debug(f"Finish reason: {finish_reason}")
+
         # Build token usage info if available (for LangSmith and response metadata)
         token_usage = None
         usage_metadata = None
@@ -210,12 +266,20 @@ class SarvamChat(BaseChatModel):
                 f"total={token_usage['total_tokens']}"
             )
 
-        # Create AIMessage with usage_metadata (only if we have actual integer values)
+        # Create AIMessage with usage_metadata and additional_kwargs
+        message_kwargs = {
+            "content": content,
+            **({"usage_metadata": usage_metadata} if usage_metadata else {}),
+        }
+        if additional_kwargs:
+            message_kwargs["additional_kwargs"] = additional_kwargs
+
         generation = ChatGeneration(
-            message=AIMessage(
-                content=content,
-                **({"usage_metadata": usage_metadata} if usage_metadata else {})
-            )
+            message=AIMessage(**message_kwargs),
+            generation_info={
+                "finish_reason": finish_reason,
+                "token_usage": token_usage,
+            }
         )
 
         return ChatResult(generations=[generation], llm_output={"token_usage": token_usage})
@@ -271,16 +335,22 @@ class SarvamChat(BaseChatModel):
             )
         params["max_tokens"] = self.max_tokens
 
-        # Note: Sarvam API does not support tools/function calling yet
-        if self.bound_tools:
+        # Handle tool/function calling - model-specific support
+        # sarvam-30b and sarvam-105b support tools, sarvam-m does not
+        if self.bound_tools and self._supports_tools():
+            # Pass tools to API for models that support it
+            params["tools"] = self.bound_tools
+            if self.tool_choice:
+                params["tool_choice"] = self.tool_choice
+            logger.debug(f"Tools passed to API for {self.model}: {[t['function']['name'] for t in self.bound_tools]}")
+        elif self.bound_tools and not self._supports_tools():
             logger.info(
-                "Sarvam AI does not support tool/function calling yet. "
-                "Tools are bound but will not be used by the API. "
-                "This feature is for future compatibility."
+                f"Tool calling not supported for {self.model}. Tools will be ignored. "
+                f"Use sarvam-30b or sarvam-105b for tool support."
             )
-            logger.debug(f"Bound tools (not used): {[t.get('name') for t in self.bound_tools]}")
+            logger.debug(f"Bound tools (not used): {[t['function']['name'] for t in self.bound_tools]}")
 
-        # Override with any additional kwargs (but exclude tools)
+        # Override with any additional kwargs (tools already handled above)
         filtered_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
         params.update(filtered_kwargs)
 
@@ -316,6 +386,29 @@ class SarvamChat(BaseChatModel):
         raw_content = message.content
         content = extract_after_think(raw_content)
 
+        # Handle tool calls in the response (for models that support tools)
+        additional_kwargs = {}
+        finish_reason = None
+        if hasattr(message, "tool_calls") and message.tool_calls and isinstance(message.tool_calls, list):
+            # Extract tool calls and store in additional_kwargs
+            tool_calls_data = []
+            for tc in message.tool_calls:
+                tool_calls_data.append({
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }
+                })
+            additional_kwargs["tool_calls"] = tool_calls_data
+            logger.debug(f"Tool calls received: {len(tool_calls_data)} calls")
+
+        # Get finish reason if available
+        if hasattr(response.choices[0], "finish_reason"):
+            finish_reason = response.choices[0].finish_reason
+            logger.debug(f"Finish reason: {finish_reason}")
+
         # Build token usage info if available
         token_usage = None
         usage_metadata = None
@@ -340,13 +433,21 @@ class SarvamChat(BaseChatModel):
                 f"total={token_usage['total_tokens']}"
             )
 
+        # Create message kwargs for AIMessageChunk
+        message_kwargs = {
+            "content": content,
+            **({"usage_metadata": usage_metadata} if usage_metadata else {}),
+        }
+        if additional_kwargs:
+            message_kwargs["additional_kwargs"] = additional_kwargs
+
         # Yield as a single chunk
         chunk = ChatGenerationChunk(
-            message=AIMessageChunk(
-                content=content,
-                **({"usage_metadata": usage_metadata} if usage_metadata else {})
-            ),
-            generation_info={"token_usage": token_usage}
+            message=AIMessageChunk(**message_kwargs),
+            generation_info={
+                "finish_reason": finish_reason,
+                "token_usage": token_usage,
+            }
         )
 
         yield chunk
@@ -370,33 +471,66 @@ class SarvamChat(BaseChatModel):
     ) -> Runnable[Any, Any]:
         """Bind tools to the chat model.
 
+        Tool/function calling is supported for sarvam-30b and sarvam-105b models only.
+        For sarvam-m, tools will be bound but not passed to the API.
+
         Args:
             tools: A list of tools to bind to the model. Can be:
                 - Dictionaries following OpenAI function format
                 - BaseTool instances
                 - Python functions
-            **kwargs: Additional arguments to pass
+            **kwargs: Additional arguments to pass (e.g., tool_choice for supported models)
 
         Returns:
             A new Runnable with tools bound
+
+        Example:
+            >>> from langchain_core.tools import tool
+            >>> @tool
+            >>> def get_weather(location: str) -> str:
+            ...     return f"Sunny in {location}"
+            >>> chat = SarvamChat(model="sarvam-30b")
+            >>> bound_chat = chat.bind_tools([get_weather])
         """
-        # Convert tools to OpenAI function format
+        # Convert tools to Sarvam API format
         formatted_tools = []
         for tool in tools:
             if isinstance(tool, dict):
-                formatted_tools.append(tool)
+                # Check if it's already in the correct format (has "type" and "function")
+                if "type" in tool and "function" in tool:
+                    formatted_tools.append(tool)
+                else:
+                    # Wrap in the correct format
+                    formatted_tools.append({
+                        "type": "function",
+                        "function": tool
+                    })
             elif isinstance(tool, BaseTool):
-                formatted_tools.append(convert_to_openai_function(tool))
+                # Convert and wrap in Sarvam format
+                function_def = convert_to_openai_function(tool)
+                formatted_tools.append({
+                    "type": "function",
+                    "function": function_def
+                })
             else:
-                formatted_tools.append(convert_to_openai_function(tool))
+                # Convert function and wrap in Sarvam format
+                function_def = convert_to_openai_function(tool)
+                formatted_tools.append({
+                    "type": "function",
+                    "function": function_def
+                })
 
         # Create a new instance with tools bound
         bound_params = {
             **self._identifying_params,
             "api_key": self.api_key,
             "bound_tools": formatted_tools,
-            **kwargs,
         }
+        # Include tool_choice if it exists
+        if self.tool_choice is not None:
+            bound_params["tool_choice"] = self.tool_choice
+        # Add any additional kwargs (they can override tool_choice)
+        bound_params.update(kwargs)
         return self.__class__(**bound_params)
 
     @override

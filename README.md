@@ -9,7 +9,6 @@ LangChain integration for [Sarvam AI](https://sarvam.ai/) - Indian language LLM 
 
 langchain-sarvam-integration is an opinionated Python library to harness Sarvam AI through LangChain, LangGraph, and LangSmith, bringing Sarvam’s LLMs and APIs cleanly into chains, agents, and RAG workflows. It enables generative chat, task orchestration, and multilingual use cases—especially for Indian languages—while keeping prompt and response handling predictable. The package standardizes Sarvam as a first-class provider across the LangChain ecosystem and is fully LangSmith-compliant for tracing and evaluation. In practice, it removes integration glue code so your architecture stays intentional instead of “creative.” Think of it as serious plumbing with just enough wit to keep your stack from leaking.
 
-#### ⚠️ Note: Tool calling not properly supported from sarvam. Use for chatbots and RAG systems, not LangChain agents.
 ## ⚠️ AI-Assisted Development Disclaimer
 
 
@@ -29,6 +28,7 @@ This project demonstrates modern AI-assisted software development practices, wit
 - 🇮🇳 **Hindi & Indic Languages** - Native language support
 - 📝 **Structured Output** - JSON extraction with Pydantic support
 - 🔧 **Task Planning** - Automatic TODO list generation
+- 🔨 **Tool/Function Calling** - Agent support for sarvam-30b and sarvam-105b models
 
 ## Installation
 
@@ -474,6 +474,133 @@ Example output:
 
 **Tip**: Use `reasoning_effort="low"` for more direct responses without extensive reasoning text.
 
+### Tool/Function Calling
+
+Tool/function calling is supported for **sarvam-30b** and **sarvam-105b** models only. This enables building LangChain agents that can use external tools and APIs.
+
+```python
+from sarvam import SarvamChat
+from langchain_core.tools import tool
+
+# Define a tool
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    # In a real application, this would call a weather API
+    return f"Sunny and 25°C in {location}"
+
+# Use sarvam-30b or sarvam-105b for tool support
+chat = SarvamChat(model="sarvam-30b")
+bound_chat = chat.bind_tools([get_weather])
+
+response = bound_chat.invoke("What's the weather in Mumbai?")
+
+# If the model chooses to use the tool, response.additional_kwargs["tool_calls"] will contain the tool calls
+if "tool_calls" in response.additional_kwargs:
+    tool_calls = response.additional_kwargs["tool_calls"]
+    for tool_call in tool_calls:
+        print(f"Tool: {tool_call['function']['name']}")
+        print(f"Arguments: {tool_call['function']['arguments']}")
+else:
+    print(response.content)
+```
+
+**Controlling Tool Behavior with `tool_choice`:**
+
+```python
+from sarvam import SarvamChat
+from langchain_core.tools import tool
+
+@tool
+def search(query: str) -> str:
+    """Search the web."""
+    return f"Results for: {query}"
+
+# Force the model to use a tool
+chat = SarvamChat(model="sarvam-105b", tool_choice="required")
+bound_chat = chat.bind_tools([search])
+
+# The model must call at least one tool
+response = bound_chat.invoke("Find information about quantum computing")
+```
+
+**Note:** The `sarvam-m` model does not support tools. If you bind tools with sarvam-m, they will be ignored and an info message will be logged.
+
+#### Tool Calling Protocol
+
+When using tool calling with supported models (sarvam-30b, sarvam-105b, sarvam-30b-16k, sarvam-105b-32k), the interaction follows a multi-turn protocol:
+
+**1. First Response**: Model may return `tool_calls` with blank/empty `content`
+
+This is **expected behavior** - the model is requesting to use tools rather than providing a text response directly:
+
+```python
+from sarvam import SarvamChat
+from langchain_core.tools import tool
+
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    return f"Sunny and 25°C in {location}"
+
+chat = SarvamChat(model="sarvam-30b")
+bound_chat = chat.bind_tools([get_weather])
+
+# First API call
+response = bound_chat.invoke("What's the weather in Mumbai?")
+
+# Check if model wants to use tools
+if "tool_calls" in response.additional_kwargs:
+    # response.content may be empty or blank - this is EXPECTED
+    print(f"Content: '{response.content}'")  # Might be "" or very brief
+    print(f"Tool calls: {response.additional_kwargs['tool_calls']}")
+```
+
+**2. Tool Result Submission**: Send tool results back via `ToolMessage`
+
+After extracting tool calls, execute the tools and submit results:
+
+```python
+from langchain_core.messages import ToolMessage
+
+messages = [
+    HumanMessage("What's the weather in Mumbai?"),
+    response  # First response with tool_calls
+]
+
+# Execute tools and add results
+for tool_call in response.additional_kwargs["tool_calls"]:
+    # Parse arguments and execute the tool
+    import json
+    args = json.loads(tool_call["function"]["arguments"])
+    result = get_weather(**args)  # Execute the function
+
+    # Add tool result to conversation
+    messages.append(ToolMessage(
+        content=result,
+        tool_call_id=tool_call["id"]
+    ))
+
+# Second API call - get final response
+final_response = bound_chat.invoke(messages)
+print(final_response.content)  # Now contains the actual answer
+```
+
+**3. Second Response**: Model returns the actual text content
+
+After processing tool results, the model provides a comprehensive text response:
+
+```python
+# final_response.content now contains the actual answer
+# Example: "The weather in Mumbai is sunny and 25°C."
+```
+
+**Key Points**:
+- Blank content on tool call requests is **correct behavior** per OpenAI's tool calling protocol
+- Always check `response.additional_kwargs["tool_calls"]` for tool requests
+- Use `ToolMessage` to submit tool results back to the model
+- The second call will have non-blank `content` with the actual answer
+
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -485,12 +612,15 @@ Example output:
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
 | `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
 | `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
+| `tool_choice` | `str` | `None` | Tool choice mode: `"none"`, `"auto"`, `"required"`, or specific tool (only for sarvam-30b and sarvam-105b) |
 
 ### Available Models
 
-- **sarvam-m**: Default model, good for general-purpose tasks
-- **sarvam-105b**: Larger model (105B parameters) for more complex reasoning and better quality responses
-- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed
+- **sarvam-m**: Default model, good for general-purpose tasks (does NOT support tool calling)
+- **sarvam-105b**: Larger model (105B parameters) for more complex reasoning and better quality responses (supports tool calling)
+- **sarvam-105b-32k**: Extended context variant (32k tokens) with same capabilities as sarvam-105b (supports tool calling)
+- **sarvam-30b**: Medium-sized model (30B parameters) balancing performance and speed (supports tool calling)
+- **sarvam-30b-16k**: Extended context variant (16k tokens) with same capabilities as sarvam-30b (supports tool calling)
 
 ### Using Different Models
 
@@ -573,20 +703,28 @@ After running your code, visit [smith.langchain.com](https://smith.langchain.com
 
 **Streaming**: The `stream()` and `astream()` methods are implemented with single-chunk fallback since **Sarvam AI API does not currently support native streaming**. The complete response is yielded as one chunk for LangChain compatibility. Native streaming will be supported when the Sarvam AI API adds this feature.
 
-**Tool/Function Calling**: The `bind_tools()` method is implemented for future compatibility, but **Sarvam AI does not currently support tool or function calling** in their API. When you bind tools, they will be stored but a warning will be issued indicating that the API won't use them. This feature will automatically work when Sarvam adds tool calling support.
+**Tool/Function Calling**: Tool/function calling is **supported for sarvam-30b and sarvam-105b models only**. The `sarvam-m` model does not support tools. When you bind tools with sarvam-m, they will be stored but an info message will be logged indicating that the API won't use them.
 
 ```python
 from sarvam import SarvamChat
 from langchain_core.tools import tool
 
 @tool
-def search(query: str) -> str:
-    """Search the web."""
-    return f"Results for: {query}"
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    return f"Sunny in {location}"
 
-chat = SarvamChat()
-bound_chat = chat.bind_tools([search])
-# Warning: Sarvam AI does not support tool/function calling yet
+# Works with sarvam-30b or sarvam-105b
+chat_30b = SarvamChat(model="sarvam-30b")
+bound_chat = chat_30b.bind_tools([get_weather])
+response = bound_chat.invoke("What's the weather in Mumbai?")
+# Tools will be passed to the API
+
+# sarvam-m does not support tools
+chat_m = SarvamChat(model="sarvam-m")  # or just SarvamChat()
+bound_chat_m = chat_m.bind_tools([get_weather])
+response_m = bound_chat_m.invoke("What's the weather in Mumbai?")
+# Info logged: Tool calling not supported for sarvam-m. Tools will be ignored.
 ```
 
 ## Development

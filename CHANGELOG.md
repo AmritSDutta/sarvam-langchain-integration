@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-03-23
+
+### Added
+- **Tool/Function calling support for sarvam-30b and sarvam-105b**: Models now support tool/function calling through `bind_tools()`
+  - `sarvam-30b`, `sarvam-30b-16k`, `sarvam-105b`, and `sarvam-105b-32k` models now pass tools to the Sarvam AI API
+  - `sarvam-m` model does not support tools (expected behavior, tools will be ignored with info log)
+  - Added `tool_choice` parameter to control tool selection behavior (none, auto, required, or specific tool)
+  - Tool calls in API responses are now properly extracted into `AIMessage.additional_kwargs["tool_calls"]`
+  - `finish_reason` is now included in response metadata for better visibility
+  - `ToolMessage` support added for multi-turn conversations with tools
+  - Added `_supports_tools()` helper method to check model-specific tool support
+- **Comprehensive model support**: Added support for extended context variants
+  - `sarvam-105b-32k`: 32k context window variant with tool support
+  - `sarvam-30b-16k`: 16k context window variant with tool support
+- **Integration test suite for tool calling**: Added comprehensive test coverage for tool/function calling
+  - `test/sarvam/test_integration_tools.py` - 38 integration tests across all 4 tool-supporting models
+  - Tests cover basic tool calling, multiple tools, tool choice modes, multi-turn conversations, and error handling
+
+### Changed
+- **Updated `bind_tools()` documentation**: Clarified that tools work for sarvam-30b, sarvam-105b, and their extended context variants, but not sarvam-m
+- **Updated `_convert_messages()`**: Now handles `ToolMessage` type for tool result messages
+- **Test output clarity**: Added clarification in integration tests that blank content is expected when model requests tool use
+  - `test_multi_turn_conversation_with_tools` now handles cases where model makes another tool call
+  - Better user feedback about expected tool calling behavior
+- **Documentation**: Added "Tool Calling Protocol" section to README.md and CLAUDE.md
+  - Explains multi-turn conversation flow with tools
+  - Clarifies that blank content on tool call requests is expected behavior (OpenAI protocol)
+  - Documents how to submit tool results via `ToolMessage`
+
+### Fixed
+- **Tool support detection**: Removed constant `_FEATURE_TOOLS_NOT_SUPPORTED` and replaced with model-specific `_supports_tools()` method
+- **Logger debug message for tool names**: Fixed logger to correctly access tool names from wrapped tool format
+  - Changed from `t.get('name')` to `t['function']['name']` to match `{"type": "function", "function": {...}}` format
+  - Fixes KeyError when logging tool information in `_generate()` and `_stream()` methods
+- **Unicode printing errors in tests**: Fixed `UnicodeEncodeError` on Windows console output
+  - All print statements now use ASCII-safe encoding for model names and response content
+  - Prevents `charmap` codec errors when printing Unicode characters on Windows (cp1252 encoding)
+- **Test compatibility with wrapped tool format**: Updated tests to access tool names using correct path
+  - Tests now use `bound_tools[0]['function']['name']` instead of `bound_tools[0]['name']`
+  - Fixed `test_llm_invoke_tools` in `test_integration.py`
+
 ## [0.1.8] - 2026-03-12
 
 ### Fixed
