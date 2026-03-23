@@ -162,7 +162,20 @@ class SarvamChat(BaseChatModel):
             params["request_options"] = RequestOptions(
                 max_retries=self.max_retry,
             )
-        params["max_tokens"] = self.max_tokens
+        # Set max_tokens based on model context window, unless user explicitly set a different value
+        # sarvam-m: 8192 tokens
+        # sarvam-30b-16k: 8192 tokens (16k context total, need room for input)
+        # All other models: 16384 tokens
+        # If user passed a custom max_tokens, respect their choice
+        if self.max_tokens != 8192:
+            # User explicitly set a custom max_tokens value
+            params["max_tokens"] = self.max_tokens
+        elif self.model == "sarvam-30b-16k":
+            params["max_tokens"] = 8192
+        elif self.model == "sarvam-m":
+            params["max_tokens"] = 8192
+        else:
+            params["max_tokens"] = 16384
 
         # Handle tool/function calling - model-specific support
         # sarvam-30b and sarvam-105b support tools, sarvam-m does not
@@ -333,7 +346,20 @@ class SarvamChat(BaseChatModel):
             params["request_options"] = RequestOptions(
                 max_retries=self.max_retry,
             )
-        params["max_tokens"] = self.max_tokens
+        # Set max_tokens based on model context window, unless user explicitly set a different value
+        # sarvam-m: 8192 tokens
+        # sarvam-30b-16k: 8192 tokens (16k context total, need room for input)
+        # All other models: 16384 tokens
+        # If user passed a custom max_tokens, respect their choice
+        if self.max_tokens != 8192:
+            # User explicitly set a custom max_tokens value
+            params["max_tokens"] = self.max_tokens
+        elif self.model == "sarvam-30b-16k":
+            params["max_tokens"] = 8192
+        elif self.model == "sarvam-m":
+            params["max_tokens"] = 8192
+        else:
+            params["max_tokens"] = 16384
 
         # Handle tool/function calling - model-specific support
         # sarvam-30b and sarvam-105b support tools, sarvam-m does not

@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Updated `bind_tools()` documentation**: Clarified that tools work for sarvam-30b, sarvam-105b, and their extended context variants, but not sarvam-m
 - **Updated `_convert_messages()`**: Now handles `ToolMessage` type for tool result messages
+- **Model-specific max_tokens defaults**: Automatically set appropriate max_tokens based on model context window (with user override support)
+  - `sarvam-m`: 8192 tokens (auto-configured when not explicitly set)
+  - `sarvam-30b-16k`: 8192 tokens (16k context total, leaves room for input tokens)
+  - `sarvam-30b`, `sarvam-105b`, `sarvam-105b-32k`: 16384 tokens (larger context windows)
+  - Users can override by passing `max_tokens` parameter during initialization
+  - This prevents context length errors while maximizing output capacity
 - **Test output clarity**: Added clarification in integration tests that blank content is expected when model requests tool use
   - `test_multi_turn_conversation_with_tools` now handles cases where model makes another tool call
   - Better user feedback about expected tool calling behavior

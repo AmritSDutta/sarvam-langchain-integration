@@ -611,7 +611,7 @@ After processing tool results, the model provides a comprehensive text response:
 | `top_p` | `float` | `1.0` | Nucleus sampling (0-1) |
 | `reasoning_effort` | `str` | `"high"` | Reasoning level: `"low"`, `"medium"`, `"high"` |
 | `wiki_grounding` | `bool` | `False` | Enable wiki grounding for factual queries |
-| `max_tokens` | `int` | `8192` | Maximum tokens to generate (prevents truncation) |
+| `max_tokens` | `int` | Model-specific | Maximum tokens to generate: `8192` for sarvam-m and sarvam-30b-16k, `16384` for others (auto-configured) |
 | `tool_choice` | `str` | `None` | Tool choice mode: `"none"`, `"auto"`, `"required"`, or specific tool (only for sarvam-30b and sarvam-105b) |
 
 ### Available Models
